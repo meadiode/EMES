@@ -16,14 +16,6 @@ void main_loop(void);
 #define DDRB_ALL  0b00001111
 #define DDRB_ADC  0b00001110
 
-#define TCCR0A_BUZZER 0b10100010
-#define TCCR0A_DISP   0b00100010
-
-
-static uint8_t kb_key = 0;
-
-static uint8_t dbuffer[9] = {0x3f, 0xc6, 0x18, 0xe3, 0x8f, 0x51, 0x11, 0x15, 0x23};
-
 typedef union
 {
     struct
@@ -82,11 +74,11 @@ static const dbuf_t disp_dn __attribute__((progmem)) = {
     .pixels.c0r6 = 0b11110,
 
     .pixels.c1r0 = 0b10001,
-    .pixels.c1r1 = 0b11001,
-    .pixels.c1r2 = 0b10101,
+    .pixels.c1r1 = 0b10001,
+    .pixels.c1r2 = 0b11001,
     .pixels.c1r3 = 0b10101,
-    .pixels.c1r4 = 0b10101,
-    .pixels.c1r5 = 0b10011,
+    .pixels.c1r4 = 0b10011,
+    .pixels.c1r5 = 0b10001,
     .pixels.c1r6 = 0b10001,
 
     .pixels.pad = 0b00,
@@ -152,6 +144,10 @@ static const dbuf_t disp_no __attribute__((progmem)) = {
 
     .pixels.pad = 0b00,
 };
+
+
+static uint8_t kb_key = 0;
+static uint8_t dbuffer[9] = {0x3f, 0xc6, 0x18, 0xe3, 0x8f, 0x51, 0x11, 0x15, 0x23};
 
 
 void poll_kb(void)
@@ -319,7 +315,6 @@ int main()
     ICR0 = 160;
     
     TCCR0A = (1 << COM0B1) | (1 << WGM01);
-    // TCCR0A |= (1 << COM0A1);
     TCCR0B = (1 << WGM03) | (1 << WGM02) | (1 << CS00);
 
     ADMUX  = 0;               /* Enable ADC input channel 0 - PB0 */
