@@ -1,2 +1,13 @@
 
 src/build
+*gerbers/*
+kicad/*/gerbers
+kicad/*/bom
+kicad/*/*-cache
+kicad/*/*-backups
+kicad/*/#auto_saved_files#
+kicad/*/_autosave*
+kicad/*/*.lck
+kicad/*/*_gerbers
+kicad/*/*_gerbers.zip
+*.kicad*-bak

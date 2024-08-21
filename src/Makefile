@@ -40,6 +40,7 @@ disable_reset_fuse:
 
 demo: $(BUILD_DIR)
 	$(COMPILE) -c demo.c -o $(BUILD_DIR)/demo.o
+	$(COMPILE) -S -c demo.c -o $(BUILD_DIR)/demo.s
 	$(COMPILE) -o $(BUILD_DIR)/demo.elf $(BUILD_DIR)/demo.o
 	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/demo.elf $(BUILD_DIR)/demo.hex
 	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/demo.elf
