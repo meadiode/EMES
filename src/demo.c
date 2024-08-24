@@ -10,9 +10,6 @@
 /* B3: DISP_CLK1 */
 
 
-void main_loop(void);
-
-
 #define DDRB_ALL  0b00001111
 #define DDRB_ADC  0b00001110
 
@@ -341,10 +338,4 @@ int main()
             asm("nop;");
         }
     }
-}
-
-
-void main_loop(void)
-{
-
 }

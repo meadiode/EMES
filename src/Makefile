@@ -29,7 +29,7 @@ CFLAGS += -mmcu=$(DEVICE)
 COMPILE = $(GCC) $(CFLAGS)
 
 
-all: demo
+all: pong
 
 $(BUILD_DIR):
 	$(MKDIR) -p $@
@@ -48,6 +48,19 @@ demo: $(BUILD_DIR)
 demo_upload: demo
 	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/demo.hex:i
 .PHONY: demo_upload
+
+
+pong: $(BUILD_DIR)
+	$(COMPILE) -c pong.c -o $(BUILD_DIR)/pong.o
+	$(COMPILE) -S -c pong.c -o $(BUILD_DIR)/pong.s
+	$(COMPILE) -o $(BUILD_DIR)/pong.elf $(BUILD_DIR)/pong.o
+	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/pong.elf $(BUILD_DIR)/pong.hex
+	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/pong.elf
+
+pong_upload: pong
+	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/pong.hex:i
+.PHONY: pong_upload
+
 
 clean:
 	$(RM) -rf $(BUILD_DIR)
