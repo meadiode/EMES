@@ -19,7 +19,7 @@
 
 static uint8_t kb_key = 0;
 static uint8_t randn = 13;
-static uint8_t dbuffer[9] = {0};
+static uint8_t dbuffer[9] = {42, 0, 13, 0};
 
 static int8_t bpos_x;
 static int8_t bpos_y;

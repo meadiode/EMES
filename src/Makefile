@@ -62,6 +62,17 @@ pong_upload: pong
 .PHONY: pong_upload
 
 
+pong_s: $(BUILD_DIR)
+	$(COMPILE) -c pong.S -o $(BUILD_DIR)/pong_s.o
+	$(COMPILE) -nostdlib -o $(BUILD_DIR)/pong_s.elf $(BUILD_DIR)/pong_s.o
+	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/pong_s.elf $(BUILD_DIR)/pong_s.hex
+	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/pong_s.elf
+
+pong_s_upload: pong_s
+	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/pong_s.hex:i
+.PHONY: pong_s_upload
+
+
 clean:
 	$(RM) -rf $(BUILD_DIR)
 .PHONY: clean
