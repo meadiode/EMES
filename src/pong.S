@@ -29,14 +29,7 @@ main:
     ldi r16, ((1 << WGM03) | (1 << WGM02) | (1 << CS00))
     out TCCR0B, r16
 
-    ldi r18, hi8(400)                                        ; Set ICR0 to 400, resulting frequency is ~20KHz
-    ldi r16, lo8(400)
-    out ICR0H, r18
-    out ICR0L, r16
-
-    ldi r16, 50                                              ; Set OCR0B to 50, resulting duty cycle is ~12.5%
-    out OCR0BH, ZERO_REG
-    out OCR0BL, r16
+    rcall no_beep
 
     rcall init
 
@@ -50,11 +43,64 @@ main_loop:
 
     rcall process_ball_x
     rcall process_ball_y
+    
+    rcall process_ai
+
+    ; Draw ball
     lds r20, bpos_x
     lds r21, bpos_y
-    rcall put_pixel    
+    rcall put_pixel
+
+    ; Draw left paddle
+    ldi r20, 0
+    lds r21, paddle_l
+    rcall put_pixel
+    inc r21
+    rcall put_pixel
+    
+    ; Draw right paddle
+    ldi r20, 12
+    lds r21, paddle_r
+    rcall put_pixel
+    inc r21
+    rcall put_pixel
+
+    ldi r28, lo8(dbuffer)
+    ldi r29, hi8(dbuffer)
+
+    cpi r26, 0
+    breq draw_dbuffer
+    
+    ldi r28, lo8(digit_0 + 0x4000)
+    ldi r29, hi8(digit_0 + 0x4000)
+
+    ldi r21, (40 * 2)
+
+    ldi r30, lo8(gs(pulse_b3))
+    ldi r31, hi8(gs(pulse_b3))
+
+    rcall draw_pixels
+
+    ldi r21, (40 * 3)
+    ldi r30, lo8(gs(pulse_b2))
+    ldi r31, hi8(gs(pulse_b2))
+
+    rcall draw_pixels
+    rjmp continue
+
+draw_dbuffer:
     rcall draw_buffer_c1
     rcall draw_buffer_c2
+
+
+continue:
+    cpi r25, 0
+    brne do_beep
+    rjmp main_loop_continue
+do_beep:
+    dec r25
+    brne main_loop_continue
+    rcall no_beep
 
 ;    ldi r20, 0
 ;    ldi r21, 3
@@ -85,8 +131,9 @@ main_loop:
 ;    rcall put_pixel
 ;    rcall draw_buffer_c1
 ;    rcall draw_buffer_c2
-    
-    ldi r16, 10
+
+main_loop_continue:    
+    ldi r16, 15
 yooge_delay_1:
     ldi r19, 200
 yooge_delay_2:
@@ -118,8 +165,8 @@ delay_loop:
 
 ; Read keyboard
 ; Checks if a key is pressed by sampling analog signal from the keyboard resistor ladder
-; Output: r20 - key id [1..4], or zero if no key is pressed
-; Used registers: r16, r20, r21, r22
+; Output: r26 - key id [1..4], or zero if no key is pressed
+; Used registers: r16, r20, r21, r22, r26
 .global poll_kb
 poll_kb:
     clr r20 
@@ -168,39 +215,61 @@ no_hibyte_inc:
 
     rjmp key_none                                            ; No key is pressed 
 
-key_1:                                                       ; Load key-id into r20 and return
-    ldi r20, 1
+key_1:                                                       ; Load key-id into r26 and return
+    ldi r26, 1
     ret
 
 key_2:
-    ldi r20, 2
+    ldi r26, 2
     ret
 
 key_3:
-    ldi r20, 3
+    ldi r26, 3
     ret
 
 key_4:
-    ldi r20, 4
+    ldi r26, 4
     ret
 
 key_none:
-    ldi r20, 0
+    ldi r26, 0
     ret
 
 
 
-.global draw_buffer_c1
-draw_buffer_c1:
-    sbi PORTB, PORTB0
-
+.global pulse_b3
+pulse_b3:
     cbi PORTB, PORTB3
     rcall delay
     sbi PORTB, PORTB3
     rcall delay
+    ret
 
-    clr r16
-for_each_pixel_c1:
+
+.global pulse_b2
+pulse_b2:
+    cbi PORTB, PORTB2
+    rcall delay
+    sbi PORTB, PORTB2
+    rcall delay
+    ret
+
+
+; Inputs: 
+;  r21 - start pixel index,
+;  Z(r31:r30) - clock pin pulse function
+;  Y(r29:r28) - pixel buffer pointer
+.global draw_pixels
+draw_pixels:
+
+    sbi PORTB, PORTB0
+    icall
+
+    mov r16, r21
+    ldi r22, 35
+    add r21, r22
+    mov r22, r28
+draw_pixels_for_each_pixel:
     mov r18, r16
     lsr r18
     lsr r18
@@ -208,32 +277,42 @@ for_each_pixel_c1:
     mov r19, r16
     andi r19, 0b111
 
-    ldi r30, lo8(dbuffer)
-    ldi r31, hi8(dbuffer)
-    add r30, r18
-    ld r20, Z
+    mov r28, r22
+    add r28, r18
+    ld r20, Y
 
-extract_pixel_bit_c1:
+draw_pixels_extract_pixel_bit:
     cpi r19, 0
-    breq read_bit_c1
+    breq draw_pixels_read_bit
     dec r19
     lsr r20
-    rjmp extract_pixel_bit_c1
+    rjmp draw_pixels_extract_pixel_bit
 
 
-read_bit_c1:
+draw_pixels_read_bit:
     cbi PORTB, PORTB0
     sbrc r20, 0
     sbi PORTB, PORTB0
 
-    cbi PORTB, PORTB3
-    rcall delay
-    sbi PORTB, PORTB3
-    rcall delay
+    icall
 
     inc r16
-    cpi r16, 35
-    brne for_each_pixel_c1
+    cp r16, r21
+    brne draw_pixels_for_each_pixel
+    mov r28, r22
+    
+    cbi PORTB, PORTB0
+
+    ret
+
+
+.global draw_buffer_c1
+draw_buffer_c1:
+    ldi r30, lo8(gs(pulse_b3))
+    ldi r31, hi8(gs(pulse_b3))
+    ldi r21, 0
+
+    rcall draw_pixels
 
     ret
 
@@ -241,48 +320,12 @@ read_bit_c1:
 
 .global draw_buffer_c2
 draw_buffer_c2:
-    sbi PORTB, PORTB0
 
-    cbi PORTB, PORTB2
-    rcall delay
-    sbi PORTB, PORTB2
-    rcall delay
-
-    ldi r16, 35
-for_each_pixel_c2:
-    mov r18, r16
-    lsr r18
-    lsr r18
-    lsr r18
-    mov r19, r16
-    andi r19, 0b111
-
-    ldi r30, lo8(dbuffer)
-    ldi r31, hi8(dbuffer)
-    add r30, r18
-    ld r20, Z
-
-extract_pixel_bit_c2:
-    cpi r19, 0
-    breq read_bit_c2
-    dec r19
-    lsr r20
-    rjmp extract_pixel_bit_c2
-
-
-read_bit_c2:
-    cbi PORTB, PORTB0
-    sbrc r20, 0
-    sbi PORTB, PORTB0
-
-    cbi PORTB, PORTB2
-    rcall delay
-    sbi PORTB, PORTB2
-    rcall delay
-
-    inc r16
-    cpi r16, 70
-    brne for_each_pixel_c2
+    ldi r30, lo8(gs(pulse_b2))
+    ldi r31, hi8(gs(pulse_b2))
+    ldi r21, 35
+    
+    rcall draw_pixels
 
     ret
 
@@ -391,6 +434,7 @@ move_ball_x_bounce_l:
     ldi r22, 1
     inc r19
     ; check paddle collision here
+    rcall beep
     rjmp move_ball_x_update
 
 
@@ -403,6 +447,7 @@ move_ball_x_right:
 move_ball_x_bounce_r:
     ldi r22, -1
     dec r19
+    rcall beep
     ; check paddle collision here
 
 move_ball_x_update:
@@ -461,6 +506,72 @@ move_ball_y_update:
     ret
 
 
+.global process_ai
+process_ai:
+    ldi r30, lo8(paddle_l)
+    ldi r31, hi8(paddle_l)
+
+    lds r18, bdir_x
+    cpi r18, 1
+    brne process_ai_move_pad
+    inc r30                                                  ; Select right pad
+
+process_ai_move_pad:
+    ld r16, Z
+    lds r19, bpos_y
+    sub r19, r16
+    brlt process_ai_move_pad_up
+    breq process_ai_done
+    inc r16
+    cpi r16, 6
+    brsh process_ai_move_pad_down_max
+    rjmp process_ai_done
+process_ai_move_pad_down_max:
+    ldi r16, 5
+    rjmp process_ai_done
+
+process_ai_move_pad_up:
+    dec r16
+    brlt process_ai_move_pad_up_max
+    rjmp process_ai_done
+process_ai_move_pad_up_max:
+    ldi r16, 0
+
+process_ai_done:
+    st Z, r16
+    ret
+
+
+.global beep
+beep:
+    ldi r25, 10
+
+    ldi r18, hi8(16000)
+    ldi r16, lo8(16000)
+    out ICR0H, r18
+    out ICR0L, r16
+
+    ldi r18, hi8(500)
+    ldi r16, lo8(500)
+    out OCR0BH, r18
+    out OCR0BL, r16
+
+    ret
+
+
+.global no_beep
+no_beep:
+    ldi r18, hi8(400)                                        ; Set ICR0 to 400, resulting frequency is ~20KHz
+    ldi r16, lo8(400)
+    out ICR0H, r18
+    out ICR0L, r16
+
+    ldi r16, 50                                              ; Set OCR0B to 50, resulting duty cycle is ~12.5%
+    out OCR0BH, ZERO_REG
+    out OCR0BL, r16
+
+    ret
+
 
 .global init
 init:
@@ -472,6 +583,7 @@ init:
 
     ldi r16, 3
     sts bpos_y, r16
+    sts paddle_r, r16
 
     ldi r16, 24
     sts bvel_x, r16
@@ -479,13 +591,49 @@ init:
     ldi r16, 8
     sts bvel_y, r16
 
+    ldi r16, 2
+    sts paddle_l, r16
+
     sts bmov_x, ZERO_REG
     sts bmov_y, ZERO_REG
+
+    ldi r25, 0
 
     ret
 
 
-.data;
+.section .text
+
+digit_0:
+    .byte 0b00101110
+    .byte 0b11001110
+    .byte 0b10011010
+    .byte 0b10100011
+    .byte 0b00000011
+
+digit_1:
+    .byte 0b10001110
+    .byte 0b00010000
+    .byte 0b01000010
+    .byte 0b00011000
+    .byte 0b00000001
+
+digit_2:
+    .byte 0b00011111
+    .byte 0b00010001
+    .byte 0b00010001
+    .byte 0b10100010
+    .byte 0b00000011
+
+digit_3:
+    .byte 0b00111110
+    .byte 0b00000100
+    .byte 0b00010111
+    .byte 0b10000010
+    .byte 0b00000111
+
+
+.section .data;
 
 bpos_x:
     .byte 0x00
@@ -503,7 +651,10 @@ bdir_x:
     .byte 0x00
 bdir_y:
     .byte 0x00
-
+paddle_l:
+    .byte 0x00
+paddle_r:
+    .byte 0x00
 dbuffer:
     .zero 9
 
