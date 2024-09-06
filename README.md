@@ -1,8 +1,11 @@
 
-
 # EMES - Epic Minimalist Entertainment System
 
-**EMES** - is a very minimalistic DIY handheld game console with the following specifications:
+**EMES** - is a very minimalistic DIY handheld game console. 
+
+Work in progress.
+
+EMES has the following specifications:
 
  - Screen: 10x7 pixels, LED
  - Input: four button keyboard
@@ -23,4 +26,20 @@ Each cartridge features an ATTiny10 MCU with the following specs:
  - RAM: 32 bytes
  - IO: 4
  - ADC: 8bit
+
+## Games
+
+Currently, just one game is implemented and is playable - a variation of Pong
+
+![EMES jif](images/EMES_03.gif)
+
+
+## Planned games
+
+At least, variations of these classics are planned to be implemented: **Snake**, **Simon says**, **Breakout/Arcanoid**
+
+## Other things to do
+
+ - Additional PCB for battery powering/charging
+ - Plastic 3d-printed case
 
