@@ -168,17 +168,17 @@ void poll_kb(void)
     samples = samples / 4;
 
 
-    if (40 <= samples && samples <= 44)
+    if (20 <= samples && samples <= 50)
     {
         kb_key = 1;
     }
     else
-    if (53 <= samples && samples <= 60)
+    if (52 <= samples && samples <= 60)
     {
         kb_key = 2;
     }
     else
-    if (61 <= samples && samples <= 69)
+    if (61 <= samples && samples <= 72)
     {
         kb_key = 3;
     }

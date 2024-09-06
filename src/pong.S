@@ -2,9 +2,16 @@
 
 #define ZERO_REG r17
 
+#define GSTATE_PRE_GAME 0
+#define GSTATE_GAME     1
+#define GSTATE_SCORE    2
+
+#define PLAYER_NONE         0
+#define PLAYER_LEFT_PADDLE  1
+#define PLAYER_RIGHT_PADDLE 2
+ 
+
 .section .data
-
-
 .section .text
 
 .global main
@@ -29,15 +36,161 @@ main:
     ldi r16, ((1 << WGM03) | (1 << WGM02) | (1 << CS00))
     out TCCR0B, r16
 
-    rcall no_beep
+;    ldi r16, hi8(RAMEND)
+;    out SPH, r16
+;    ldi r16, lo8(RAMEND)
+;    out SPL, r16
 
+
+    rcall no_beep
     rcall init
 
 main_loop:
 
-    cbi DDRB, 0                                              ; Set B0 as input to poll the keyboard
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+
+    lds r16, gstate
+    cpi r16, GSTATE_GAME
+    breq gstate_game
+    cpi r16, GSTATE_SCORE
+    breq gstate_score
+
+
+gstate_pre_game:
     rcall poll_kb
-    sbi DDRB, 0                                              ; Set B0 back as output
+    rcall clear_buffer
+    rcall render_game
+
+    andi r26, 0x7f
+    cpi r26, 0
+    breq main_loop_cont1
+    
+    ldi r16, GSTATE_GAME
+    sts gstate, r16
+
+    cpi r26, 3
+    brlo select_left_paddle
+    ldi r16, PLAYER_RIGHT_PADDLE
+    sts player, r16
+    rjmp main_loop_cont1
+select_left_paddle:
+    ldi r16, PLAYER_LEFT_PADDLE
+    sts player, r16
+    rjmp main_loop_cont1
+
+
+gstate_game:
+    rcall poll_kb
+    rcall clear_buffer
+    rcall process_input
+    rcall process_ball_x
+    cpi r16, 0
+    brne continue
+    rcall process_ball_y
+    rcall process_ai
+    rcall render_game
+main_loop_cont1:
+    rjmp continue
+
+
+gstate_score:    
+    mov r16, r23
+    andi r16, 0b11111
+    cpi r16, 15
+    brsh gstate_score_blink
+
+    ldi r28, lo8(digit_0 + 0x4000)
+    ldi r29, hi8(digit_0 + 0x4000)
+
+    ldi r18, 40
+    mov r16, r27
+    swap r16
+    andi r16, 0b11
+    ldi r21, 0
+
+gstate_score_p1_calc_r21:
+    subi r16, 1
+    brcs gstate_score_p1_points
+    add r21, r18
+    rjmp gstate_score_p1_calc_r21
+
+gstate_score_p1_points:
+    ldi r30, lo8(gs(pulse_b3))
+    ldi r31, hi8(gs(pulse_b3))
+    rcall draw_pixels
+
+    ldi r18, 40
+    mov r16, r27
+    andi r16, 0b11
+gstate_score_p1_higher:
+    ldi r21, 0
+
+gstate_score_p2_calc_r21:
+    subi r16, 1
+    brcs gstate_score_p2_points
+    add r21, r18
+    rjmp gstate_score_p2_calc_r21
+
+gstate_score_p2_points:
+    ldi r30, lo8(gs(pulse_b2))
+    ldi r31, hi8(gs(pulse_b2))
+    rcall draw_pixels
+
+    rjmp gstate_score_continue
+
+gstate_score_blink:
+    rcall clear_buffer
+    ldi r28, lo8(dbuffer)
+    ldi r29, hi8(dbuffer)
+    rcall draw_buffer_c1
+    rcall draw_buffer_c2
+
+gstate_score_continue:
+    subi r23, 1
+    brcc continue
+
+    mov r16, r27
+    andi r16, 0b11
+    cpi r16, 3
+    brsh start_new_game
+
+    mov r16, r27
+    swap r16
+    andi r16, 0b11
+    cpi r16, 3
+    brsh start_new_game
+    
+    ldi r16, GSTATE_GAME
+    sts gstate, r16
+    rcall new_point
+
+    rjmp continue
+
+start_new_game:
+    rcall init
+
+/*
+process_game_:
+    rcall process_game
+    rjmp continue
+
+
+    rcall poll_kb
 
     rcall clear_buffer
 
@@ -45,6 +198,9 @@ main_loop:
     rcall process_ball_y
     
     rcall process_ai
+
+    rcall render_game
+    rjmp continue
 
     ; Draw ball
     lds r20, bpos_x
@@ -92,6 +248,7 @@ draw_dbuffer:
     rcall draw_buffer_c1
     rcall draw_buffer_c2
 
+*/
 
 continue:
     cpi r25, 0
@@ -101,36 +258,6 @@ do_beep:
     dec r25
     brne main_loop_continue
     rcall no_beep
-
-;    ldi r20, 0
-;    ldi r21, 3
-;    rcall put_pixel
-;    ldi r20, 1
-;    rcall put_pixel
-;    ldi r20, 2
-;    rcall put_pixel
-;    ldi r20, 3
-;    rcall put_pixel
-;    ldi r20, 4
-;    rcall put_pixel
-;    ldi r20, 5
-;    rcall put_pixel
-;    ldi r20, 6
-;    rcall put_pixel
-;    ldi r20, 7
-;    rcall put_pixel
-;    ldi r20, 8
-;    rcall put_pixel
-;    ldi r20, 9
-;    rcall put_pixel
-;    ldi r20, 10
-;    rcall put_pixel
-;    ldi r20, 11
-;    rcall put_pixel
-;    ldi r20, 12
-;    rcall put_pixel
-;    rcall draw_buffer_c1
-;    rcall draw_buffer_c2
 
 main_loop_continue:    
     ldi r16, 15
@@ -143,9 +270,6 @@ yooge_delay_2:
     dec r16
     brne yooge_delay_1
 
-;    cbi PORTB, PORTB3
-;    rcall delay
-;    sbi PORTB, PORTB3
     rjmp main_loop
 
 
@@ -173,6 +297,8 @@ poll_kb:
     clr r21
     ldi r16, 4
 
+    cbi DDRB, 0                                              ; Set B0 as input to poll the keyboard
+
 adc_sample_loop:                                             ; Sample ADC 4 times and store the sum of samples in R21-R20
     sbi ADCSRA, ADSC
 
@@ -187,6 +313,7 @@ adc_wait_loop:
 no_hibyte_inc:
     dec r16
     brne adc_sample_loop
+    sbi DDRB, 0                                              ; Set B0 back as output
 
     lsr r21                                                  ; Divide R21-R20 by 4 to find average
     ror r20
@@ -194,18 +321,18 @@ no_hibyte_inc:
     ror r20
 
     mov r16, r20                                             ; Check if the resulting value corresponds to one of the keys
-    subi r16, 40
-    cpi r16, (4 + 1)
+    subi r16, 20
+    cpi r16, (30 + 1)
     brlo key_1
 
     mov r16, r20
-    subi r16, 53
-    cpi r16, (7 + 1)
+    subi r16, 52
+    cpi r16, (8 + 1)
     brlo key_2
 
     mov r16, r20
     subi r16, 61
-    cpi r16, (8 + 1)
+    cpi r16, (11 + 1)
     brlo key_3
 
     mov r16, r20
@@ -216,25 +343,36 @@ no_hibyte_inc:
     rjmp key_none                                            ; No key is pressed 
 
 key_1:                                                       ; Load key-id into r26 and return
-    ldi r26, 1
-    ret
+    ldi r16, 1
+    rjmp poll_kb_update_r26
 
 key_2:
-    ldi r26, 2
-    ret
+    ldi r16, 2
+    rjmp poll_kb_update_r26
 
 key_3:
-    ldi r26, 3
-    ret
+    ldi r16, 3
+    rjmp poll_kb_update_r26
 
 key_4:
-    ldi r26, 4
-    ret
+    ldi r16, 4
+    rjmp poll_kb_update_r26
 
 key_none:
-    ldi r26, 0
-    ret
+    ldi r16, 0
+    rjmp poll_kb_update_r26
 
+poll_kb_update_r26:
+    mov r20, r26
+    andi r20, 0x7f
+    cp r16, r20
+    brne poll_kb_key_change
+    mov r26, r16
+    ret
+poll_kb_key_change:
+    mov r26, r16
+    ori r26, 0x80
+    ret
 
 
 .global pulse_b3
@@ -256,9 +394,11 @@ pulse_b2:
 
 
 ; Inputs: 
-;  r21 - start pixel index,
-;  Z(r31:r30) - clock pin pulse function
-;  Y(r29:r28) - pixel buffer pointer
+;   r21 - start pixel index,
+;   Z(r31:r30) - clock pin pulse function
+;   Y(r29:r28) - pixel buffer pointer
+; Used registers:
+;   r16, r18, r19, r20, r21, r22, r28, r29, r30, r31
 .global draw_pixels
 draw_pixels:
 
@@ -412,6 +552,7 @@ process_ball_x:
     lds r20, bmov_x
     lds r21, bvel_x
     lds r22, bdir_x
+    lds r23, bpos_y
 
     add r20, r21
 
@@ -433,7 +574,16 @@ move_ball_x:
 move_ball_x_bounce_l:
     ldi r22, 1
     inc r19
+
     ; check paddle collision here
+    lds r24, paddle_l
+    sub r23, r24
+    cpi r23, 2
+    brlo move_ball_x_bounce_l_ok
+    inc r27
+    rjmp move_ball_x_miss
+
+move_ball_x_bounce_l_ok:
     rcall beep
     rjmp move_ball_x_update
 
@@ -447,15 +597,33 @@ move_ball_x_right:
 move_ball_x_bounce_r:
     ldi r22, -1
     dec r19
-    rcall beep
+    
     ; check paddle collision here
+    lds r24, paddle_r
+    sub r23, r24
+    cpi r23, 2
+    brlo move_ball_x_bounce_r_ok
+    swap r27
+    inc r27
+    swap r27
+    rjmp move_ball_x_miss
+
+move_ball_x_bounce_r_ok:
+    rcall beep
 
 move_ball_x_update:
     sts bpos_x, r19
     sts bmov_x, r20
     sts bvel_x, r21
     sts bdir_x, r22
+    ldi r16, 0
     ret
+
+move_ball_x_miss:
+    ldi r16, GSTATE_SCORE
+    sts gstate, r16
+    ldi r23, 128
+    ret    
 
 
 .global process_ball_y
@@ -511,10 +679,17 @@ process_ai:
     ldi r30, lo8(paddle_l)
     ldi r31, hi8(paddle_l)
 
+    lds r16, player
     lds r18, bdir_x
     cpi r18, 1
-    brne process_ai_move_pad
-    inc r30                                                  ; Select right pad
+    brne process_ai_select_left_pad
+    cpi r16, PLAYER_RIGHT_PADDLE
+    breq process_ai_return
+    inc r30
+    rjmp process_ai_move_pad
+process_ai_select_left_pad:
+    cpi r16, PLAYER_LEFT_PADDLE
+    breq process_ai_return
 
 process_ai_move_pad:
     ld r16, Z
@@ -539,7 +714,66 @@ process_ai_move_pad_up_max:
 
 process_ai_done:
     st Z, r16
+process_ai_return:
     ret
+
+
+.global process_input
+process_input:
+    
+    lds r16, player
+    cpi r16, PLAYER_LEFT_PADDLE
+    breq process_input_lpad
+    cpi r16, PLAYER_RIGHT_PADDLE
+    breq process_input_rpad
+    ret
+
+process_input_lpad:
+    lds r16, paddle_l
+    cpi r26, (0x80 | 0x01)
+    breq process_input_lpad_up
+    cpi r26, (0x80 | 0x02)
+    breq process_input_lpad_down
+    ret
+process_input_lpad_up:
+    cpi r16, 0
+    breq process_input_lpad_done
+    dec r16
+    rjmp process_input_lpad_done
+
+process_input_lpad_down:
+    cpi r16, 5
+    breq process_input_lpad_done
+    inc r16
+    rjmp process_input_lpad_done
+
+process_input_lpad_done:
+    sts paddle_l, r16
+    ret
+
+process_input_rpad:
+    lds r16, paddle_r
+    cpi r26, (0x80 | 0x03)
+    breq process_input_rpad_up
+    cpi r26, (0x80 | 0x04)
+    breq process_input_rpad_down
+    ret
+process_input_rpad_up:
+    cpi r16, 0
+    breq process_input_rpad_done
+    dec r16
+    rjmp process_input_rpad_done
+
+process_input_rpad_down:
+    cpi r16, 5
+    breq process_input_rpad_done
+    inc r16
+    rjmp process_input_rpad_done
+
+process_input_rpad_done:
+    sts paddle_r, r16
+    ret
+
 
 
 .global beep
@@ -573,17 +807,77 @@ no_beep:
     ret
 
 
-.global init
-init:
-    ldi r16, 1
+
+.global render_game
+render_game:
+    ; Draw ball
+    lds r20, bpos_x
+    lds r21, bpos_y
+    rcall put_pixel
+
+    ; Draw left paddle
+    ldi r20, 0
+    lds r21, paddle_l
+    rcall put_pixel
+    inc r21
+    rcall put_pixel
+    
+    ; Draw right paddle
+    ldi r20, 12
+    lds r21, paddle_r
+    rcall put_pixel
+    inc r21
+    rcall put_pixel
+
+/*
+    ldi r21, 0
+    ldi r20, 8
+    rcall put_pixel
+    ldi r20, 9
+    rcall put_pixel
+    ldi r20, 10
+    rcall put_pixel
+    ldi r20, 11
+    rcall put_pixel
+    ldi r20, 12
+    rcall put_pixel
+*/
+
+
+    ldi r28, lo8(dbuffer)
+    ldi r29, hi8(dbuffer)
+
+/*
+    ldi r30, lo8(gs(pulse_b3))
+    ldi r31, hi8(gs(pulse_b3))
+    ldi r21, 0
+    rcall draw_pixels
+
+
+    ldi r30, lo8(gs(pulse_b2))
+    ldi r31, hi8(gs(pulse_b2))
+    ldi r21, 35
+
+    rcall draw_pixels
+*/
+    rcall draw_buffer_c1
+    rcall draw_buffer_c2
+
+    ret
+
+
+.global new_point
+new_point:
+    ldi r16, 2
     sts bpos_x, r16
 
+    ldi r16, 1
     sts bdir_x, r16
     sts bdir_y, r16
 
     ldi r16, 3
     sts bpos_y, r16
-    sts paddle_r, r16
+    ldi r16, 0
 
     ldi r16, 24
     sts bvel_x, r16
@@ -593,10 +887,21 @@ init:
 
     ldi r16, 2
     sts paddle_l, r16
+    sts paddle_r, r16
+
+    ret
+
+
+.global init
+init:
+    rcall new_point
 
     sts bmov_x, ZERO_REG
     sts bmov_y, ZERO_REG
+    sts gstate, ZERO_REG
+    sts player, ZERO_REG
 
+    ldi r27, 0
     ldi r25, 0
 
     ret
@@ -655,6 +960,11 @@ paddle_l:
     .byte 0x00
 paddle_r:
     .byte 0x00
+gstate:
+    .byte 0x00
+player:
+    .byte 0x00
+
 dbuffer:
     .zero 9
 
