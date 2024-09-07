@@ -36,33 +36,10 @@ main:
     ldi r16, ((1 << WGM03) | (1 << WGM02) | (1 << CS00))
     out TCCR0B, r16
 
-;    ldi r16, hi8(RAMEND)
-;    out SPH, r16
-;    ldi r16, lo8(RAMEND)
-;    out SPL, r16
-
-
     rcall no_beep
     rcall init
 
 main_loop:
-
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-
 
     lds r16, gstate
     cpi r16, GSTATE_GAME
@@ -183,72 +160,6 @@ gstate_score_continue:
 
 start_new_game:
     rcall init
-
-/*
-process_game_:
-    rcall process_game
-    rjmp continue
-
-
-    rcall poll_kb
-
-    rcall clear_buffer
-
-    rcall process_ball_x
-    rcall process_ball_y
-    
-    rcall process_ai
-
-    rcall render_game
-    rjmp continue
-
-    ; Draw ball
-    lds r20, bpos_x
-    lds r21, bpos_y
-    rcall put_pixel
-
-    ; Draw left paddle
-    ldi r20, 0
-    lds r21, paddle_l
-    rcall put_pixel
-    inc r21
-    rcall put_pixel
-    
-    ; Draw right paddle
-    ldi r20, 12
-    lds r21, paddle_r
-    rcall put_pixel
-    inc r21
-    rcall put_pixel
-
-    ldi r28, lo8(dbuffer)
-    ldi r29, hi8(dbuffer)
-
-    cpi r26, 0
-    breq draw_dbuffer
-    
-    ldi r28, lo8(digit_0 + 0x4000)
-    ldi r29, hi8(digit_0 + 0x4000)
-
-    ldi r21, (40 * 2)
-
-    ldi r30, lo8(gs(pulse_b3))
-    ldi r31, hi8(gs(pulse_b3))
-
-    rcall draw_pixels
-
-    ldi r21, (40 * 3)
-    ldi r30, lo8(gs(pulse_b2))
-    ldi r31, hi8(gs(pulse_b2))
-
-    rcall draw_pixels
-    rjmp continue
-
-draw_dbuffer:
-    rcall draw_buffer_c1
-    rcall draw_buffer_c2
-
-*/
 
 continue:
     cpi r25, 0
@@ -829,37 +740,9 @@ render_game:
     inc r21
     rcall put_pixel
 
-/*
-    ldi r21, 0
-    ldi r20, 8
-    rcall put_pixel
-    ldi r20, 9
-    rcall put_pixel
-    ldi r20, 10
-    rcall put_pixel
-    ldi r20, 11
-    rcall put_pixel
-    ldi r20, 12
-    rcall put_pixel
-*/
-
-
     ldi r28, lo8(dbuffer)
     ldi r29, hi8(dbuffer)
 
-/*
-    ldi r30, lo8(gs(pulse_b3))
-    ldi r31, hi8(gs(pulse_b3))
-    ldi r21, 0
-    rcall draw_pixels
-
-
-    ldi r30, lo8(gs(pulse_b2))
-    ldi r31, hi8(gs(pulse_b2))
-    ldi r21, 35
-
-    rcall draw_pixels
-*/
     rcall draw_buffer_c1
     rcall draw_buffer_c2
 

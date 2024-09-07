@@ -74,6 +74,18 @@ pong_s_upload: pong_s
 .PHONY: pong_s_upload
 
 
+snake: $(BUILD_DIR)
+	$(COMPILE) -c snake.S -o $(BUILD_DIR)/snake.o
+	$(COMPILE) -nostdlib -o $(BUILD_DIR)/snake.elf $(BUILD_DIR)/snake.o
+	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/snake.elf $(BUILD_DIR)/snake.hex
+	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/snake.elf
+
+snake_upload: snake
+	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/snake.hex:i
+.PHONY: snake_upload
+
+
+
 clean:
 	$(RM) -rf $(BUILD_DIR)
 .PHONY: clean
