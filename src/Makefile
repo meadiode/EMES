@@ -23,7 +23,6 @@ STRIP   = $(CROSS_COMPILE)strip
 
 CFLAGS =
 CFLAGS += -Wall
-# CFLAGS += -mshort-calls
 CFLAGS += -Os
 CFLAGS += -mmcu=$(DEVICE)
 

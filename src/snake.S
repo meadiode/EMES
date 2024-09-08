@@ -1,8 +1,9 @@
 #include <avr/io.h>
 
-#define ZERO_REG   r16
-#define BEEP_REG   r25
-#define KB_REG     r26
+#define ZERO_REG          r16
+#define BEEP_REG          r25
+#define KB_REG            r26
+#define SNEKBUF_SIZE_REG  r27
 
 #define DIR_UP     0x00
 #define DIR_DOWN   0x03
@@ -42,8 +43,10 @@ main:
 main_loop:
     rcall clear_buffer
     rcall poll_kb
-    rcall process_input
-    rcall move_head
+ ;   rcall process_input
+    rcall move_snek
+  
+    rcall trace_snek
     rcall render_game
 
 continue:
@@ -71,7 +74,7 @@ yooge_delay_2:
 
 
 ; Simple delay routine - about 7us at 8MHz main clock
-; Used registers: r18
+; Touched registers: r18
 .global delay
 delay:
     ldi r18, 10
@@ -86,7 +89,7 @@ delay_loop:
 ; Read keyboard
 ; Checks if a key is pressed by sampling analog signal from the keyboard resistor ladder
 ; Output: r26 - key id [1..4], or zero if no key is pressed
-; Used registers: r17, r20, r21, r22, r26
+; Touched registers: r17, r20, r21, r22, r26
 .global poll_kb
 poll_kb:
     clr r20 
@@ -194,7 +197,7 @@ pulse_b2:
 ;   r21 - start pixel index,
 ;   Z(r31:r30) - clock pin pulse function
 ;   Y(r29:r28) - pixel buffer pointer
-; Used registers:
+; Touched registers:
 ;   r17, r18, r19, r20, r21, r22, r28, r29, r30, r31
 .global draw_pixels
 draw_pixels:
@@ -281,15 +284,19 @@ clear_loop:
     ret
 
 
-; input: r20 = x, r21 = y 
+; Draws a pixel in the frame buffer
+; Inputs:
+;  r20 - pixel x
+;  r21 - pixel y 
+; Touched registers: r17, r23, r24, r30, r31
 .global put_pixel
 put_pixel:
-    ldi r22, 6       ; calculate (6 - y) * 5
-    sub r22, r21
-    mov r23, r22
-    lsl r22
-    lsl r22
-    add r22, r23
+    ldi r17, 6       ; calculate (6 - y) * 5
+    sub r17, r21
+    mov r23, r17
+    lsl r17
+    lsl r17
+    add r17, r23
 
     cpi r20, 5
     brlo put_pixel_c1
@@ -300,37 +307,37 @@ put_pixel:
     sub r24, r23
     ldi r23, 35
     add r23, r24
-    add r22, r23
+    add r17, r23
     rjmp calc_byte_n
 
 put_pixel_c1:
     ldi r23, 4
     sub r23, r20
-    add r22, r23 ; r22 contains bit number
+    add r17, r23 ; r17 contains bit number
 
 calc_byte_n:
-    mov r23, r22
+    mov r23, r17
     lsr r23
     lsr r23
     lsr r23      ; r23 contains byte number
 
     ldi r24, 1
-    andi r22, 0b111
+    andi r17, 0b111
 
 calc_mask:
-    cpi r22, 0
+    cpi r17, 0
     breq apply_mask
     lsl r24
-    dec r22
+    dec r17
     rjmp calc_mask
 
 apply_mask:
     ldi r30, lo8(dbuffer)
     ldi r31, hi8(dbuffer)
     add r30, r23
-    ld r22, Z
-    or r22, r24
-    st Z, r22
+    ld r17, Z
+    or r17, r24
+    st Z, r17
 
     ret
 
@@ -366,48 +373,78 @@ no_beep:
     ret
 
 
-.global move_head
-move_head:
+.global move_snek
+move_snek:
     lds r18, move_t
     inc r18
 
-    cpi r18, 60
-    breq do_move
-    rjmp move_head_done
+    cpi r18, 100
+    breq do_move_snek
+    rjmp move_snek_done
 
-do_move:
+do_move_snek:
     ldi r18, 0
-    lds r19, hdir
+    
+    ;inc SNEKBUF_SIZE_REG
+    rjmp move_snek_done
+
     lds r20, head_x
     lds r21, head_y
+    lds r22, hdir
 
-    cpi r19, DIR_UP
-    breq do_move_up
-    cpi r19, DIR_DOWN
-    breq do_move_down
-    
-    cpi r19, DIR_LEFT
-    breq do_move_left
-    
-    inc r20            ; else move right
-    rjmp do_move_done
+    rcall move_snek_cursor
 
-do_move_up:
-    dec r21
-    rjmp do_move_done
-do_move_down:
-    inc r21
-    rjmp do_move_done
-do_move_left:
-    dec r20
-do_move_done:
-    sts hdir, r19
     sts head_x, r20
     sts head_y, r21
 
-move_head_done:
+move_snek_done:
     sts move_t, r18
     ret
+
+
+.global move_snek_cursor
+ ; Advances a 2d cursor according to the heading direction
+ ; Inputs:
+ ;  r20 - cursor x
+ ;  r21 - cursor y
+ ;  r22 - heading direction
+ ; Outputs:
+ ;  r20 - updated cursor x
+ ;  r21 - updated cursor y
+ ; Touched registers: r20, r21
+move_snek_cursor:
+    cpi r22, DIR_UP
+    breq move_snek_cursor_up
+    cpi r22, DIR_DOWN
+    breq move_snek_cursor_down
+    cpi r22, DIR_LEFT
+    breq move_snek_cursor_left
+    inc r20            ; else move right
+    cpi r20, 10
+    brlo move_snek_cursor_done
+    ldi r20, 0
+
+    rjmp move_snek_cursor_done
+
+move_snek_cursor_up:
+    dec r21
+    brpl move_snek_cursor_done
+    ldi r21, 6
+    rjmp move_snek_cursor_done
+move_snek_cursor_down:
+    inc r21
+    cpi r21, 7
+    brlo move_snek_cursor_done
+    ldi r21, 0
+    rjmp move_snek_cursor_done
+move_snek_cursor_left:
+    dec r20
+    brpl move_snek_cursor_done
+    ldi r20, 9
+
+move_snek_cursor_done:
+    ret
+
 
 
 .global process_input
@@ -419,16 +456,105 @@ process_input:
     cpi r17, 0
     breq process_input_done
     dec r17
-    sts hdir, r17
+
+    ; check if the new direction is oposite to the current one
+    lds r18, hdir
+    ldi r19, 3
+    sub r19, r18
+    cp r17, r19
+    breq process_input_done
+
+    sts hdir, r17            ; update direction
 process_input_done:
     ret
 
 
-.global render_game
-render_game:
+.global trace_snek
+trace_snek:
+    ldi r28, lo8(snek_buffer)
+    ldi r29, hi8(snek_buffer)
+
     lds r20, head_x
     lds r21, head_y
+
     rcall put_pixel
+
+    lds r17, hdir
+    ldi r22, 3
+    sub r22, r17             ; reverse heading direction
+
+    ;ldi r19, 0b11111111
+    ldi r18, 0               ; r18 stores current bit index in snek_buffer
+
+snek_buffer_bit_iter:
+
+    mov r17, r18
+    andi r17, 0b111
+    brne next_snek_segment
+    ld r19, Y+               ; r19 sores current byte from snek_buffer 
+    ;ldi r19, 0b00110000
+
+next_snek_segment:
+    lsl r19
+    ; if next bit is zero, then it's a straight segment
+    brcc next_snek_segment_continue 
+    ; else, it's a turn so read the next bit to see where it turns
+    inc r18
+    mov r17, r18
+    andi r17, 0b111
+    ; fetch the next byte if the current one ended
+    brne next_snek_segment_turn
+    ld r19, Y+
+
+next_snek_segment_turn:
+    lsl r19
+    brcs next_snek_segment_turn_right
+    cpi r22, DIR_UP
+    breq next_snek_segment_tl
+    cpi r22, DIR_DOWN
+    breq next_snek_segment_tr
+    cpi r22, DIR_LEFT
+    breq next_snek_segment_td
+    rjmp next_snek_segment_tu
+
+next_snek_segment_turn_right:
+    cpi r22, DIR_UP
+    breq next_snek_segment_tr
+    cpi r22, DIR_DOWN
+    breq next_snek_segment_tl
+    cpi r22, DIR_LEFT
+    breq next_snek_segment_tu
+    rjmp next_snek_segment_td    
+
+next_snek_segment_tl:
+    ldi r22, DIR_LEFT
+    rjmp next_snek_segment_continue
+next_snek_segment_tr:
+    ldi r22, DIR_RIGHT
+    rjmp next_snek_segment_continue
+next_snek_segment_tu:
+    ldi r22, DIR_UP
+    rjmp next_snek_segment_continue
+next_snek_segment_td:
+    ldi r22, DIR_DOWN
+next_snek_segment_continue:
+
+    rcall move_snek_cursor
+    rcall put_pixel
+
+    inc r18
+    cp r18, SNEKBUF_SIZE_REG
+    brlo snek_buffer_bit_iter
+
+    ret
+
+
+
+.global render_game
+render_game:
+    ;lds r20, head_x
+    ;lds r21, head_y
+    ;rcall put_pixel
 
     ldi r28, lo8(dbuffer)
     ldi r29, hi8(dbuffer)
@@ -442,11 +568,32 @@ render_game:
 .global init
 init:
     sts move_t, ZERO_REG
-    sts head_x, ZERO_REG
-    sts head_y, ZERO_REG
 
+    ldi r17, 4
+    sts head_x, r17
+    ldi r17, 0
+    sts head_y, r17
     ldi r17, DIR_RIGHT
     sts hdir, r17
+
+    
+    ; testing
+
+    ldi SNEKBUF_SIZE_REG, 32
+
+    ldi r17, 0b00100100
+    sts snek_buffer, r17
+
+    ldi r17, 0b11000110
+    sts (snek_buffer + 1), r17
+
+    ldi r17, 0b00000001
+    sts (snek_buffer + 2), r17
+
+    ldi r17, 0b10000110
+    sts (snek_buffer + 3), r17
+
+    ; /testing
 
     ret
 
@@ -462,11 +609,14 @@ head_y:
     .byte 0x00
 hdir:
     .byte 0x00
+prev_hdir:
+    .byte 0x00
 size:
     .byte 0x00
 grow_size:
     .byte 0x00
-
+snek_buffer:
+    .zero 6
 dbuffer:
     .zero 9
 
