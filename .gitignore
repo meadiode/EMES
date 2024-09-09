@@ -1,6 +1,6 @@
 
 src/build
-*gerbers/*
+kicad/gerbers/*
 kicad/*/gerbers
 kicad/*/bom
 kicad/*/*-cache
