@@ -38,6 +38,8 @@ main:
     rcall no_beep
     rcall init
 
+    rcall trace_snek
+    rcall spawn_food
 
 main_loop:
     rcall clear_buffer
@@ -245,31 +247,6 @@ draw_pixels_read_bit:
     ret
 
 
-.global draw_buffer_c1
-draw_buffer_c1:
-    ldi r30, lo8(gs(pulse_b3))
-    ldi r31, hi8(gs(pulse_b3))
-    ldi r21, 0
-
-    rcall draw_pixels
-
-    ret
-
-
-
-.global draw_buffer_c2
-draw_buffer_c2:
-
-    ldi r30, lo8(gs(pulse_b2))
-    ldi r31, hi8(gs(pulse_b2))
-    ldi r21, 35
-    
-    rcall draw_pixels
-
-    ret
-
-
-
 .global clear_buffer
 clear_buffer:
     ldi r30, lo8(dbuffer)
@@ -287,7 +264,9 @@ clear_loop:
 ; Draws a pixel in the frame buffer
 ; Inputs:
 ;  r20 - pixel x
-;  r21 - pixel y 
+;  r21 - pixel y
+; Outputs:
+;  r23 - nonzero if there's a pixel already at (x, y)
 ; Touched registers: r17, r23, r24, r30, r31
 put_pixel:
     ldi r17, 6       ; calculate (6 - y) * 5
@@ -335,6 +314,8 @@ apply_mask:
     ldi r31, hi8(dbuffer)
     add r30, r23
     ld r17, Z
+    mov r23, r17
+    and r23, r24
     or r17, r24
     st Z, r17
 
@@ -399,9 +380,9 @@ do_move_snek:
     lds r19, prev_hdir
     sts prev_hdir, r22
     cp r19, r22              ; Check if the snake turned
-    breq move_snek_done
+    breq move_snek_check_food
 
-    ; Putting a turn into snek_buffer
+    ; Recording a turn in snek_buffer
     rcall shift_snek_buffer
     lds r17, snek_buffer
     ori r17, 0b01000000
@@ -422,6 +403,18 @@ do_move_snek_turn_updown:
 
 do_move_snek_write_turn:
     sts snek_buffer, r17
+
+move_snek_check_food:
+    ; Check if the food was eaten
+    lds r18, food_pos
+    mov r19, r20
+    swap r19
+    or r19, r21
+    cp r18, r19
+    brne move_snek_done
+    rcall trace_snek
+    rcall spawn_food
+    rcall beep
 
 move_snek_done:
     ret
@@ -600,14 +593,96 @@ next_snek_segment_continue:
 
 .global render_game
 render_game:
-    ;lds r20, head_x
-    ;lds r21, head_y
-    ;rcall put_pixel
+    
+    lds r20, food_pos
+    mov r21, r20
+    swap r20
+    andi r20, 0b1111
+    andi r21, 0b1111
+    rcall put_pixel
 
     ldi r28, lo8(dbuffer)
     ldi r29, hi8(dbuffer)
-    rcall draw_buffer_c1
-    rcall draw_buffer_c2
+
+    ldi r30, lo8(gs(pulse_b3))
+    ldi r31, hi8(gs(pulse_b3))
+    ldi r21, 0
+    rcall draw_pixels
+
+    ldi r30, lo8(gs(pulse_b2))
+    ldi r31, hi8(gs(pulse_b2))
+    ldi r21, 35
+    rcall draw_pixels
+    
+    ret
+
+
+
+.global rand
+rand:
+    lds r17, seed
+    
+    ; seed = seed ^ (seed << 3)
+    mov r18, r17
+    lsl r18
+    lsl r18
+    lsl r18
+    eor r17, r18
+
+    ; seed = seed ^ (seed >> 1)
+    mov r18, r17
+    lsr r18
+    eor r17, r18
+
+    ; seed = seed ^ (seed << 5)
+    mov r18, r17
+    lsl r18
+    lsl r18
+    lsl r18
+    lsl r18
+    lsl r18
+
+;    ldi r19, 5
+;lshift_seed_x5:
+;    lsl r18
+;    subi r19, 1
+;    brne lshift_seed_x5
+
+    eor r17, r18
+
+    sts seed, r17
+    ret
+
+
+.global spawn_food
+spawn_food:
+    rcall rand
+    lds r20, seed
+    mov r21, r20
+    swap r21
+    andi r20, 0b1111
+    andi r21, 0b1111
+
+spawn_food_clamp_x:
+    cpi r20, 10
+    brlo spawn_food_clamp_y
+    lsr r20
+    rjmp spawn_food_clamp_x
+
+spawn_food_clamp_y:
+    cpi r21, 7
+    brlo do_spawn_food
+    lsr r21
+    rjmp spawn_food_clamp_y
+
+do_spawn_food:
+    rcall put_pixel
+    cpi r23, 0
+    brne spawn_food
+
+    swap r20
+    or r20, r21
+    sts food_pos, r20
 
     ret
 
@@ -625,6 +700,9 @@ init:
     sts hdir, r17
     ldi r17, DIR_LEFT
     sts prev_hdir, r17
+
+    ldi r17, 42
+    sts seed, r17
 
     ; testing
 
@@ -664,6 +742,10 @@ prev_hdir:
 size:
     .byte 0x00
 grow_size:
+    .byte 0x00
+food_pos:
+    .byte 0x00
+seed:
     .byte 0x00
 snek_buffer:
     .zero 6
