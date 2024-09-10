@@ -3,7 +3,6 @@
 #define ZERO_REG          r16
 #define BEEP_REG          r25
 #define KB_REG            r26
-#define SNEKBUF_SIZE_REG  r27
 
 #define DIR_UP     0x00
 #define DIR_DOWN   0x03
@@ -43,7 +42,7 @@ main:
 main_loop:
     rcall clear_buffer
     rcall poll_kb
- ;   rcall process_input
+    rcall process_input
     rcall move_snek
   
     rcall trace_snek
@@ -73,9 +72,9 @@ yooge_delay_2:
 
 
 
+.global delay
 ; Simple delay routine - about 7us at 8MHz main clock
 ; Touched registers: r18
-.global delay
 delay:
     ldi r18, 10
     ;mov r18, r20
@@ -86,11 +85,11 @@ delay_loop:
     ret
 
 
+.global poll_kb
 ; Read keyboard
 ; Checks if a key is pressed by sampling analog signal from the keyboard resistor ladder
 ; Output: r26 - key id [1..4], or zero if no key is pressed
 ; Touched registers: r17, r20, r21, r22, r26
-.global poll_kb
 poll_kb:
     clr r20 
     clr r21
@@ -193,13 +192,13 @@ pulse_b2:
     ret
 
 
+.global draw_pixels
 ; Inputs: 
 ;   r21 - start pixel index,
 ;   Z(r31:r30) - clock pin pulse function
 ;   Y(r29:r28) - pixel buffer pointer
 ; Touched registers:
 ;   r17, r18, r19, r20, r21, r22, r28, r29, r30, r31
-.global draw_pixels
 draw_pixels:
 
     sbi PORTB, PORTB0
@@ -284,12 +283,12 @@ clear_loop:
     ret
 
 
+.global put_pixel
 ; Draws a pixel in the frame buffer
 ; Inputs:
 ;  r20 - pixel x
 ;  r21 - pixel y 
 ; Touched registers: r17, r23, r24, r30, r31
-.global put_pixel
 put_pixel:
     ldi r17, 6       ; calculate (6 - y) * 5
     sub r17, r21
@@ -378,15 +377,14 @@ move_snek:
     lds r18, move_t
     inc r18
 
-    cpi r18, 100
+    cpi r18, 30
     breq do_move_snek
+    sts move_t, r18
     rjmp move_snek_done
 
 do_move_snek:
     ldi r18, 0
-    
-    ;inc SNEKBUF_SIZE_REG
-    rjmp move_snek_done
+    sts move_t, r18
 
     lds r20, head_x
     lds r21, head_y
@@ -397,8 +395,55 @@ do_move_snek:
     sts head_x, r20
     sts head_y, r21
 
+    rcall shift_snek_buffer
+    lds r19, prev_hdir
+    sts prev_hdir, r22
+    cp r19, r22              ; Check if the snake turned
+    breq move_snek_done
+
+    ; Putting a turn into snek_buffer
+    rcall shift_snek_buffer
+    lds r17, snek_buffer
+    ori r17, 0b01000000
+    
+    cpi r19, DIR_UP
+    breq do_move_snek_turn_updown
+    cpi r19, DIR_DOWN
+    breq do_move_snek_turn_updown
+    eor r19, r22
+    sbrs r19, 0
+    ori r17, 0b00100000
+    rjmp do_move_snek_write_turn
+ 
+do_move_snek_turn_updown:
+    eor r19, r22
+    sbrc r19, 0
+    ori r17, 0b00100000
+
+do_move_snek_write_turn:
+    sts snek_buffer, r17
+
 move_snek_done:
-    sts move_t, r18
+    ret
+
+
+.global shift_snek_buffer
+; Shifts right every byte in snek_buffer
+; Touched registers: r17, r18, r28, r29
+shift_snek_buffer:
+
+    ldi r28, lo8(snek_buffer)
+    ldi r29, hi8(snek_buffer)
+    ldi r17, 6
+    clc
+
+shift_snek_buffer_nb:
+    ld r18, Y
+    ror r18
+    st Y+, r18
+    dec r17
+    brne shift_snek_buffer_nb
+
     ret
 
 
@@ -458,9 +503,9 @@ process_input:
     dec r17
 
     ; check if the new direction is oposite to the current one
-    lds r18, hdir
+    lds r24, hdir
     ldi r19, 3
-    sub r19, r18
+    sub r19, r24
     cp r17, r19
     breq process_input_done
 
@@ -479,11 +524,12 @@ trace_snek:
 
     rcall put_pixel
 
-    lds r17, hdir
+    lds r17, prev_hdir
     ldi r22, 3
     sub r22, r17             ; reverse heading direction
 
     ;ldi r19, 0b11111111
+    ldi r27, 1               ; r27 stores current snake segment index
     ldi r18, 0               ; r18 stores current bit index in snek_buffer
 
 snek_buffer_bit_iter:
@@ -542,8 +588,10 @@ next_snek_segment_continue:
     rcall move_snek_cursor
     rcall put_pixel
 
+    inc r27
     inc r18
-    cp r18, SNEKBUF_SIZE_REG
+    lds r17, size
+    cp r27, r17
     brlo snek_buffer_bit_iter
 
     ret
@@ -569,28 +617,30 @@ render_game:
 init:
     sts move_t, ZERO_REG
 
-    ldi r17, 4
+    ldi r17, 3
     sts head_x, r17
-    ldi r17, 0
+    ldi r17, 4
     sts head_y, r17
-    ldi r17, DIR_RIGHT
+    ldi r17, DIR_LEFT
     sts hdir, r17
+    ldi r17, DIR_LEFT
+    sts prev_hdir, r17
 
-    
     ; testing
 
-    ldi SNEKBUF_SIZE_REG, 32
+    ldi r17, 5
+    sts size, r17
 
-    ldi r17, 0b00100100
+    ldi r17, 0b01010000
     sts snek_buffer, r17
 
-    ldi r17, 0b11000110
+    ldi r17, 0b00000000
     sts (snek_buffer + 1), r17
 
-    ldi r17, 0b00000001
+    ldi r17, 0b00000000
     sts (snek_buffer + 2), r17
 
-    ldi r17, 0b10000110
+    ldi r17, 0b00000000
     sts (snek_buffer + 3), r17
 
     ; /testing
