@@ -9,6 +9,11 @@
 #define DIR_LEFT   0x01
 #define DIR_RIGHT  0x02
 
+#define GSTATE_GAME  0x00
+#define GSTATE_SCORE 0x01
+
+
+#define SNEK_MOVE_TIME 128
 
 .section .data
 .section .text
@@ -42,11 +47,15 @@ main:
     rcall spawn_food
 
 main_loop:
+    brtc game_loop
+    rcall beep
+    rjmp continue
+
+game_loop:
     rcall clear_buffer
     rcall poll_kb
     rcall process_input
     rcall move_snek
-  
     rcall trace_snek
     rcall render_game
 
@@ -60,15 +69,12 @@ do_beep:
     rcall no_beep
 
 main_loop_continue:    
-    ldi r17, 15
-yooge_delay_1:
-    ldi r19, 200
-yooge_delay_2:
+
+    ldi r17, 250
+yooge_delay:
     rcall delay
-    dec r19
-    brne yooge_delay_2
     dec r17
-    brne yooge_delay_1
+    brne yooge_delay
 
     rjmp main_loop
 
@@ -79,7 +85,6 @@ yooge_delay_2:
 ; Touched registers: r18
 delay:
     ldi r18, 10
-    ;mov r18, r20
 delay_loop:
     nop;
     dec r18
@@ -358,7 +363,7 @@ move_snek:
     lds r18, move_t
     inc r18
 
-    cpi r18, 30
+    cpi r18, SNEK_MOVE_TIME
     breq do_move_snek
     sts move_t, r18
     rjmp move_snek_done
@@ -414,7 +419,12 @@ move_snek_check_food:
     brne move_snek_done
     rcall trace_snek
     rcall spawn_food
+    rcall clear_buffer
     rcall beep
+
+    lds r18, size
+    inc r18
+    sts size, r18
 
 move_snek_done:
     ret
@@ -515,13 +525,18 @@ trace_snek:
     lds r20, head_x
     lds r21, head_y
 
-    rcall put_pixel
+    rcall put_pixel          ; Draw the snake's head
+
+    lds r17, move_t
+    andi r17, 0b111
+    cpi r17, 0
+    brne trace_snek_done     ; Draw rest of the snake only once every 8 frames.
+                             ; so it would appear dimmer than the head
 
     lds r17, prev_hdir
     ldi r22, 3
     sub r22, r17             ; reverse heading direction
 
-    ;ldi r19, 0b11111111
     ldi r27, 1               ; r27 stores current snake segment index
     ldi r18, 0               ; r18 stores current bit index in snek_buffer
 
@@ -531,7 +546,6 @@ snek_buffer_bit_iter:
     andi r17, 0b111
     brne next_snek_segment
     ld r19, Y+               ; r19 sores current byte from snek_buffer 
-    ;ldi r19, 0b00110000
 
 next_snek_segment:
     lsl r19
@@ -580,19 +594,30 @@ next_snek_segment_continue:
 
     rcall move_snek_cursor
     rcall put_pixel
+    
+    cpi r23, 0               ; Check if the snake bites itself
+    breq next_snek_segment_continue2
+    set                      ; If yes, set T to indicate endgame
 
+next_snek_segment_continue2:
     inc r27
     inc r18
     lds r17, size
     cp r27, r17
     brlo snek_buffer_bit_iter
 
+trace_snek_done:
     ret
 
 
 
 .global render_game
 render_game:
+    
+    lds r17, move_t
+    andi r17, 0b11111
+    cpi r17, 16
+    brlo render_game_cont    ; Skip drawing food half of the time, to make it appear blinking
     
     lds r20, food_pos
     mov r21, r20
@@ -601,6 +626,7 @@ render_game:
     andi r21, 0b1111
     rcall put_pixel
 
+render_game_cont:
     ldi r28, lo8(dbuffer)
     ldi r29, hi8(dbuffer)
 
@@ -692,9 +718,9 @@ do_spawn_food:
 init:
     sts move_t, ZERO_REG
 
-    ldi r17, 3
-    sts head_x, r17
     ldi r17, 4
+    sts head_x, r17
+    ldi r17, 3
     sts head_y, r17
     ldi r17, DIR_LEFT
     sts hdir, r17
@@ -706,10 +732,10 @@ init:
 
     ; testing
 
-    ldi r17, 5
+    ldi r17, 2
     sts size, r17
 
-    ldi r17, 0b01010000
+    ldi r17, 0b00000000
     sts snek_buffer, r17
 
     ldi r17, 0b00000000
@@ -741,14 +767,12 @@ prev_hdir:
     .byte 0x00
 size:
     .byte 0x00
-grow_size:
-    .byte 0x00
 food_pos:
     .byte 0x00
 seed:
     .byte 0x00
 snek_buffer:
-    .zero 6
+    .zero 7
 dbuffer:
     .zero 9
 
