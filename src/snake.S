@@ -41,14 +41,56 @@ main:
     out TCCR0B, r17
 
     rcall no_beep
-    rcall init
-
-    rcall trace_snek
-    rcall spawn_food
+    rcall new_game
 
 main_loop:
     brtc game_loop
-    rcall beep
+; Game over/score count loop    
+    
+    rcall poll_kb
+    andi KB_REG, 0b10000000
+    breq game_over_loop_cont
+    clt
+    rcall new_game
+
+game_over_loop_cont:
+    lds r17, move_t
+    cpi r17, 250
+    brlo game_over_loop_cont2
+    sts move_t, ZERO_REG
+    ldi r23, 0
+    ldi r24, 0
+    lds r27, size
+    ldi r28, lo8(digit_0 + 0x4000)
+    ldi r29, hi8(digit_0 + 0x4000)
+
+
+game_over_loop_cont2:
+    rcall clear_display
+    cpi r27, 0
+    breq game_over_loop_disp
+    dec r27
+    ldi r17, 5
+    add r23, r17
+    cpi r23, 50
+    brne game_over_loop_disp
+    ldi r23, 0
+    add r24, r17
+
+game_over_loop_disp:
+    ldi r28, lo8(digit_0 + 0x4000)
+    ldi r30, lo8(gs(pulse_b3))
+    ldi r31, hi8(gs(pulse_b3))
+    add r28, r24
+    ldi r21, 0
+    rcall draw_pixels 
+    ldi r28, lo8(digit_0 + 0x4000)
+    ldi r30, lo8(gs(pulse_b2))
+    ldi r31, hi8(gs(pulse_b2))
+    add r28, r23
+    ldi r21, 0
+    rcall draw_pixels
+
     rjmp continue
 
 game_loop:
@@ -265,6 +307,22 @@ clear_loop:
     ret
 
 
+.global clear_display
+clear_display:
+    sbi PORTB, PORTB0
+    rcall pulse_b3
+    rcall pulse_b2
+    cbi PORTB, PORTB0
+    ldi r17, 35
+clear_display_each_pixel:
+    rcall pulse_b3
+    rcall pulse_b2
+    dec r17
+    brne clear_display_each_pixel    
+    
+    ret
+
+
 .global put_pixel
 ; Draws a pixel in the frame buffer
 ; Inputs:
@@ -329,15 +387,15 @@ apply_mask:
 
 .global beep
 beep:
-    ldi BEEP_REG, 10
+    ldi BEEP_REG, 20
 
-    ldi r18, hi8(16000)
-    ldi r17, lo8(16000)
+    ldi r18, hi8(8000)
+    ldi r17, lo8(8000)
     out ICR0H, r18
     out ICR0L, r17
 
-    ldi r18, hi8(500)
-    ldi r17, lo8(500)
+    ldi r18, hi8(250)
+    ldi r17, lo8(250)
     out OCR0BH, r18
     out OCR0BL, r17
 
@@ -598,6 +656,9 @@ next_snek_segment_continue:
     cpi r23, 0               ; Check if the snake bites itself
     breq next_snek_segment_continue2
     set                      ; If yes, set T to indicate endgame
+    ldi r17, 250
+    sts move_t, r17
+    rjmp trace_snek_done
 
 next_snek_segment_continue2:
     inc r27
@@ -661,18 +722,18 @@ rand:
     eor r17, r18
 
     ; seed = seed ^ (seed << 5)
-    mov r18, r17
-    lsl r18
-    lsl r18
-    lsl r18
-    lsl r18
-    lsl r18
-
-;    ldi r19, 5
-;lshift_seed_x5:
+;    mov r18, r17
 ;    lsl r18
-;    subi r19, 1
-;    brne lshift_seed_x5
+;    lsl r18
+;    lsl r18
+;    lsl r18
+;    lsl r18
+
+    ldi r19, 5
+lshift_seed_x5:
+    lsl r18
+    subi r19, 1
+    brne lshift_seed_x5
 
     eor r17, r18
 
@@ -713,44 +774,107 @@ do_spawn_food:
     ret
 
 
+.global new_game
+new_game:
+    rcall init
+    rcall clear_buffer
+    rcall trace_snek
+    rcall spawn_food
+    ret
 
 .global init
 init:
     sts move_t, ZERO_REG
 
-    ldi r17, 4
+    ldi r17, 2
     sts head_x, r17
-    ldi r17, 3
     sts head_y, r17
-    ldi r17, DIR_LEFT
     sts hdir, r17
-    ldi r17, DIR_LEFT
     sts prev_hdir, r17
 
-    ldi r17, 42
-    sts seed, r17
-
-    ; testing
+;    ldi r17, 42
+;    sts seed, r17
 
     ldi r17, 2
     sts size, r17
 
-    ldi r17, 0b00000000
-    sts snek_buffer, r17
-
-    ldi r17, 0b00000000
-    sts (snek_buffer + 1), r17
-
-    ldi r17, 0b00000000
-    sts (snek_buffer + 2), r17
-
-    ldi r17, 0b00000000
-    sts (snek_buffer + 3), r17
-
-    ; /testing
+    sts snek_buffer, ZERO_REG
 
     ret
 
+
+.section .text
+
+digit_0:
+    .byte 0b00101110
+    .byte 0b11001110
+    .byte 0b10011010
+    .byte 0b10100011
+    .byte 0b00000011
+
+digit_1:
+    .byte 0b10001110
+    .byte 0b00010000
+    .byte 0b01000010
+    .byte 0b00011000
+    .byte 0b00000001
+
+digit_2:
+    .byte 0b00011111
+    .byte 0b00010001
+    .byte 0b00010001
+    .byte 0b10100010
+    .byte 0b00000011
+
+digit_3:
+    .byte 0b00111110
+    .byte 0b00000100
+    .byte 0b00010111
+    .byte 0b10000010
+    .byte 0b00000111
+
+digit_4:
+    .byte 0b00100001
+    .byte 0b10000100
+    .byte 0b00011111
+    .byte 0b01100011
+    .byte 0b00000100
+
+
+digit_5:
+    .byte 0b00111111
+    .byte 0b00000100
+    .byte 0b00001111
+    .byte 0b11100001
+    .byte 0b00000111
+
+digit_6:
+    .byte 0b00101110
+    .byte 0b01000110
+    .byte 0b00001111
+    .byte 0b10100001
+    .byte 0b00000011
+
+digit_7:
+    .byte 0b10000100
+    .byte 0b00010000
+    .byte 0b00010001
+    .byte 0b11000010
+    .byte 0b00000111
+
+digit_8:
+    .byte 0b00101110
+    .byte 0b01000110
+    .byte 0b00010111
+    .byte 0b10100011
+    .byte 0b00000011
+
+digit_9:
+    .byte 0b00101110
+    .byte 0b00000100
+    .byte 0b00010111
+    .byte 0b10100011
+    .byte 0b00000011
 
 .section .data;
 
@@ -775,6 +899,5 @@ snek_buffer:
     .zero 7
 dbuffer:
     .zero 9
-
 
 .end
