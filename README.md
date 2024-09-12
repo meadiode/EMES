@@ -29,14 +29,15 @@ Each cartridge features an ATTiny10 MCU with the following specs:
 
 ## Games
 
-Currently, just one game is implemented and is playable - a variation of Pong
+Currently, two games are implemented and playable - variations of Pong and Snake. 
 
 ![EMES jif](images/EMES_03.gif)
+![EMES jif](images/EMES_04.gif)
 
 
 ## Planned games
 
-At least, variations of these classics are planned to be implemented: **Snake**, **Simon says**, **Breakout/Arcanoid**
+Variations of these classics are planned to be implemented: **Simon says**, **Breakout/Arkanoid**
 
 ## Other things to do
 
