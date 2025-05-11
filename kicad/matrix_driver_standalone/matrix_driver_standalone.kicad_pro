@@ -508,7 +508,7 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "",
+      "plot": "matrix_driver_standalone_gerbers/",
       "pos_files": "",
       "specctra_dsn": "",
       "step": "",

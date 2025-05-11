@@ -534,7 +534,7 @@
       "plot": "display_matrix_gerbers/",
       "pos_files": "./placement",
       "specctra_dsn": "",
-      "step": "",
+      "step": "display_matrix.step",
       "svg": "",
       "vrml": ""
     },
