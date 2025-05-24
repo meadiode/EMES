@@ -1,5 +1,6 @@
 
 src/build
+src/IS31FL3743A_demo/build
 kicad/gerbers/*
 kicad/*/gerbers
 kicad/*/bom
