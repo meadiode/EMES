@@ -265,7 +265,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "proto_breadboard.kicad_pro",
+    "filename": "proto_breadboard2.kicad_pro",
     "version": 3
   },
   "net_settings": {
@@ -426,7 +426,7 @@
   "sheets": [
     [
       "9121eaa1-199f-4b0a-955e-7211dee87885",
-      ""
+      "Root"
     ]
   ],
   "text_variables": {}

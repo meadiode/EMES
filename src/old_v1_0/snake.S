@@ -9,10 +9,6 @@
 #define DIR_LEFT   0x01
 #define DIR_RIGHT  0x02
 
-#define GSTATE_GAME  0x00
-#define GSTATE_SCORE 0x01
-
-
 #define SNEK_MOVE_TIME 128
 
 .section .data
@@ -722,13 +718,7 @@ rand:
     eor r17, r18
 
     ; seed = seed ^ (seed << 5)
-;    mov r18, r17
-;    lsl r18
-;    lsl r18
-;    lsl r18
-;    lsl r18
-;    lsl r18
-
+    mov r18, r17
     ldi r19, 5
 lshift_seed_x5:
     lsl r18
