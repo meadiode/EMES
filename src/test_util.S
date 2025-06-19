@@ -37,9 +37,6 @@ main:
     out TCCR0B, r17
 
 
-;    ldi r21, 0xfc
-;    rcall display_read_reg
-
     ldi r23, 2
     rcall display_set_reg_page
 
@@ -75,37 +72,77 @@ write_pwm_val:
     cpi r21, (198 + 1)
     brne write_pwm_val
 
-    ldi r29, 8
-
 main_loop:
-    rcall no_beep
-    ldi r17, 40
-    rcall looong_delay;
+    rcall poll_kb
 
-    rcall beep
-    ldi r17, 16
-    rcall looong_delay
+    cpi r26, 0x81
+    breq key_1
+    cpi r26, 0x82
+    breq key_2
+    cpi r26, 0x83
+    breq key_3
+    cpi r26, 0x84
+    breq key_4
+    rjmp key_none
 
-    cpi r29, 8
-    breq reload_img_ptr
-    rjmp draw_img
 
-reload_img_ptr:
+key_1:
     ldi r30, lo8(img_club + 0x4000)
     ldi r31, hi8(img_club + 0x4000)
-    ldi r29, 0
+    ldi r19, hi8(8000000 / 250)
+    ldi r18, lo8(8000000 / 250)
+    rcall beep
+    rjmp draw_img
+
+key_2:
+    ldi r30, lo8(img_heart + 0x4000)
+    ldi r31, hi8(img_heart + 0x4000)
+    ldi r19, hi8(8000000 / 350)
+    ldi r18, lo8(8000000 / 350)
+    rcall beep
+    rjmp draw_img
+
+key_3:
+    ldi r30, lo8(img_spade + 0x4000)
+    ldi r31, hi8(img_spade + 0x4000)
+    ldi r19, hi8(8000000 / 600)
+    ldi r18, lo8(8000000 / 600)
+    rcall beep
+    rjmp draw_img
+
+key_4:
+    ldi r30, lo8(img_diamond + 0x4000)
+    ldi r31, hi8(img_diamond + 0x4000)
+    ldi r19, hi8(8000000 / 1000)
+    ldi r18, lo8(8000000 / 1000)
+    rcall beep
+    rjmp draw_img
+
+key_none:
+    rcall no_beep
+
+    cpi r29, 0x80
+    brlo disp_star_img
+    ldi r30, lo8(img_emes + 0x4000)
+    ldi r31, hi8(img_emes + 0x4000)
+    rjmp draw_img
+
+disp_star_img:
+    ldi r30, lo8(img_star + 0x4000)
+    ldi r31, hi8(img_star + 0x4000)
 
 draw_img:
     rcall display_draw_img_15x10
-    inc r29
 
+    ldi r17, 99
+    rcall long_delay
+    inc r29
     rjmp main_loop
 
 
 .global delay
 delay:
     ret
-
 
 .global long_delay
 ; Long delay routine - from ~100us to ~25ms at 8MHz
@@ -328,62 +365,59 @@ display_read_reg:
 ; Touched registers: r17, r20, r21, r22, r26
 poll_kb:
     clr r20 
+    clr r21 
     ldi r17, 4
 
-adc_sample_loop:             ; Sample ADC 4 times and store average in r20
+poll_kb_adc_sample_loop:             ; Sample ADC 4 times and store average in r20
     sbi ADCSRA, ADSC
 
-adc_wait_loop:
+poll_kb_adc_wait_loop:
     sbic ADCSRA, ADSC
-    rjmp adc_wait_loop
+    rjmp poll_kb_adc_wait_loop
     in r22, ADCL
-    lsr r22                  ; Divide by 4
-    lsr r22
-    add r20, r22
-
+    adc r20, r22
+    brcc poll_kb_no_hibyte_inc
+    inc r21
+poll_kb_no_hibyte_inc:
     dec r17
-    brne adc_sample_loop
+    brne poll_kb_adc_sample_loop
 
-    mov r17, r20             ; Check if the resulting value corresponds to one of the keys
-    subi r17, 20
-    cpi r17, (30 + 1)
-    brlo key_1
+    lsr r21                  ; Divide R21-R20 by 4 to find average
+    ror r20
+    lsr r21
+    ror r20
 
-    mov r17, r20
-    subi r17, 52
-    cpi r17, (8 + 1)
-    brlo key_2
+    cpi r20, 40                ; Check if the resulting value corresponds to one of the keys
+    brlo poll_kb_key_none
+    cpi r20, 51
+    brlo poll_kb_key_1
+    cpi r20, 61
+    brlo poll_kb_key_2
+    cpi r20, 73
+    brlo poll_kb_key_3
+    cpi r20, 83
+    brlo poll_kb_key_4
 
-    mov r17, r20
-    subi r17, 61
-    cpi r17, (11 + 1)
-    brlo key_3
-
-    mov r17, r20
-    subi r17, 74
-    cpi r17, (8 + 1)
-    brlo key_4
-
-    rjmp key_none            ; No key is pressed 
+    rjmp poll_kb_key_none            ; No key is pressed 
 
 ; Load key-id into KB_REG and return
-key_1:                       ; UP key
+poll_kb_key_1:                       ; UP key
     ldi r17, (DIR_UP + 1)
     rjmp poll_kb_update_r26
 
-key_2:                       ; DOWN key
+poll_kb_key_2:                       ; DOWN key
     ldi r17, (DIR_DOWN + 1)
     rjmp poll_kb_update_r26
 
-key_3:                       ; LEFT key
+poll_kb_key_3:                       ; LEFT key
     ldi r17, (DIR_LEFT + 1)               
     rjmp poll_kb_update_r26
 
-key_4:                       ; RIGHT key
+poll_kb_key_4:                       ; RIGHT key
     ldi r17, (DIR_RIGHT + 1)
     rjmp poll_kb_update_r26
 
-key_none:
+poll_kb_key_none:
     ldi r17, 0
 
 poll_kb_update_r26:
@@ -404,10 +438,10 @@ beep:
     ldi r17, ((1 << COM0B1) | (1 << WGM01))
     out TCCR0A, r17
     
-    ldi r18, hi8(32000)
-    ldi r17, lo8(32000)
-    out ICR0H, r18
-    out ICR0L, r17
+;    ldi r18, hi8(32000)
+;    ldi r17, lo8(32000)
+    out ICR0H, r19
+    out ICR0L, r18
 
     ldi r18, hi8(500)
     ldi r17, lo8(500)
@@ -424,55 +458,30 @@ no_beep:
     ret
 
 
-.global process_input
-process_input:
-    sbrs KB_REG, 7
-    rjmp process_input_done
-    nop
-    nop
-    nop
-process_input_done:
-    ret
-
-
-.global rand
-rand:
-    lds r17, seed
-    
-    ; seed = seed ^ (seed << 3)
-    mov r18, r17
-    lsl r18
-    lsl r18
-    lsl r18
-    eor r17, r18
-
-    ; seed = seed ^ (seed >> 1)
-    mov r18, r17
-    lsr r18
-    eor r17, r18
-
-    ; seed = seed ^ (seed << 5)
-    ldi r19, 5
-lshift_seed_x5:
-    lsl r18
-    subi r19, 1
-    brne lshift_seed_x5
-
-    eor r17, r18
-
-    sts seed, r17
-    ret
-
-
-.global init
-init:
-
-;    ldi r17, 42
-;    sts seed, r17
-    ret
-
-
 .section .text
+
+; 15x10
+img_star:
+    .byte 0b00000001
+    .byte 0b00000000
+    .byte 0b00000111
+    .byte 0b00000000
+    .byte 0b00001010
+    .byte 0b00000000
+    .byte 0b00110110
+    .byte 0b00000111
+    .byte 0b11000111
+    .byte 0b11000110
+    .byte 0b00000011
+    .byte 0b00000010
+    .byte 0b00001000
+    .byte 0b00000101
+    .byte 0b11010000
+    .byte 0b00011110
+    .byte 0b11110000
+    .byte 0b00110000
+    .byte 0b01100000
+
 
 ; 15x10
 img_club:
@@ -566,72 +575,6 @@ img_spade:
 
 
 ; 15x10
-img_doom:
-    .byte 0b11101111
-    .byte 0b11100011
-    .byte 0b00110110
-    .byte 0b11101110
-    .byte 0b01101101
-    .byte 0b11111100
-    .byte 0b11011011
-    .byte 0b11111001
-    .byte 0b10110110
-    .byte 0b10110011
-    .byte 0b01101100
-    .byte 0b01100110
-    .byte 0b11011000
-    .byte 0b11001010
-    .byte 0b01010001
-    .byte 0b10100000
-    .byte 0b00000011
-    .byte 0b10000000
-    .byte 0b00000100
-
-; 15x10
-img_star:
-    .byte 0b00000001
-    .byte 0b00000000
-    .byte 0b00000111
-    .byte 0b00000000
-    .byte 0b00001010
-    .byte 0b00000000
-    .byte 0b00110110
-    .byte 0b00000111
-    .byte 0b11000111
-    .byte 0b11000110
-    .byte 0b00000011
-    .byte 0b00000010
-    .byte 0b00001000
-    .byte 0b00000101
-    .byte 0b11010000
-    .byte 0b00011110
-    .byte 0b11110000
-    .byte 0b00110000
-    .byte 0b01100000
-
-; 15x10
-img_gameover:
-    .byte 0b11100100
-    .byte 0b10100111
-    .byte 0b01010110
-    .byte 0b10101011
-    .byte 0b10111101
-    .byte 0b01011001
-    .byte 0b01011010
-    .byte 0b10101110
-    .byte 0b10100000
-    .byte 0b01100000
-    .byte 0b00011000
-    .byte 0b00111010
-    .byte 0b10100110
-    .byte 0b01010101
-    .byte 0b01101010
-    .byte 0b10101010
-    .byte 0b10011001
-    .byte 0b11001001
-    .byte 0b10101000
-
-; 15x10
 img_emes:
     .byte 0b11000000
     .byte 0b01100111
@@ -654,117 +597,7 @@ img_emes:
     .byte 0b11000000
 
 
-
-symbol_1:
-    .byte 0b00000000
-    .byte 0b00010000
-    .byte 0b00010101
-    .byte 0b00010101
-    .byte 0b00000001
-
-symbol_2:
-    .byte 0b00111111
-    .byte 0b11000110
-    .byte 0b00011000
-    .byte 0b00111111
-    .byte 0b00000000
-
-symbol_3:
-    .byte 0b00000000
-    .byte 0b00010000
-    .byte 0b11110010
-    .byte 0b00001001
-    .byte 0b00000001
-
-symbol_4:
-    .byte 0b00101110
-    .byte 0b11010110
-    .byte 0b11101000
-    .byte 0b00000000
-    .byte 0b00000000
-
-digit_0:
-    .byte 0b00101110
-    .byte 0b11001110
-    .byte 0b10011010
-    .byte 0b10100011
-    .byte 0b00000011
-
-digit_1:
-    .byte 0b10001110
-    .byte 0b00010000
-    .byte 0b01000010
-    .byte 0b00011000
-    .byte 0b00000001
-
-digit_2:
-    .byte 0b00011111
-    .byte 0b00010001
-    .byte 0b00010001
-    .byte 0b10100010
-    .byte 0b00000011
-
-digit_3:
-    .byte 0b00111110
-    .byte 0b00000100
-    .byte 0b00010111
-    .byte 0b10000010
-    .byte 0b00000111
-
-digit_4:
-    .byte 0b00100001
-    .byte 0b10000100
-    .byte 0b00011111
-    .byte 0b01100011
-    .byte 0b00000100
-
-
-digit_5:
-    .byte 0b00111111
-    .byte 0b00000100
-    .byte 0b00001111
-    .byte 0b11100001
-    .byte 0b00000111
-
-digit_6:
-    .byte 0b00101110
-    .byte 0b01000110
-    .byte 0b00001111
-    .byte 0b10100001
-    .byte 0b00000011
-
-digit_7:
-    .byte 0b10000100
-    .byte 0b00010000
-    .byte 0b00010001
-    .byte 0b11000010
-    .byte 0b00000111
-
-digit_8:
-    .byte 0b00101110
-    .byte 0b01000110
-    .byte 0b00010111
-    .byte 0b10100011
-    .byte 0b00000011
-
-digit_9:
-    .byte 0b00101110
-    .byte 0b00000100
-    .byte 0b00010111
-    .byte 0b10100011
-    .byte 0b00000011
-
 .section .data;
-
-
-gstate:
-    .byte 0x00
-seed:
-    .byte 0x00
-start_seed:
-    .byte 0x00
-seq_length:
-    .byte 0x00
 
 
 .end

@@ -44,9 +44,21 @@ demo: $(BUILD_DIR)
 	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/demo.elf $(BUILD_DIR)/demo.hex
 	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/demo.elf
 
+
+test_util: $(BUILD_DIR)
+	$(COMPILE) -c test_util.S -o $(BUILD_DIR)/test_util.o
+	$(COMPILE) -nostdlib -o $(BUILD_DIR)/test_util.elf $(BUILD_DIR)/test_util.o
+	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/test_util.elf $(BUILD_DIR)/test_util.hex
+	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/test_util.elf
+
+
 demo_upload: demo
 	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/demo.hex:i
 .PHONY: demo_upload
+
+test_util_upload: test_util
+	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/test_util.hex:i
+.PHONY: test_util_upload
 
 clean:
 	$(RM) -rf $(BUILD_DIR)
