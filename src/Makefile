@@ -52,6 +52,13 @@ test_util: $(BUILD_DIR)
 	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/test_util.elf
 
 
+pong: $(BUILD_DIR)
+	$(COMPILE) -c pong.S -o $(BUILD_DIR)/pong.o
+	$(COMPILE) -nostdlib -o $(BUILD_DIR)/pong.elf $(BUILD_DIR)/pong.o
+	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/pong.elf $(BUILD_DIR)/pong.hex
+	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/pong.elf
+
+
 demo_upload: demo
 	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/demo.hex:i
 .PHONY: demo_upload
@@ -59,6 +66,11 @@ demo_upload: demo
 test_util_upload: test_util
 	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/test_util.hex:i
 .PHONY: test_util_upload
+
+pong_upload: pong
+	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/pong.hex:i
+.PHONY: pong_upload
+
 
 clean:
 	$(RM) -rf $(BUILD_DIR)
