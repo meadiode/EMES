@@ -13,3 +13,4 @@ kicad/*/*_gerbers
 kicad/*/*_gerbers.zip
 kicad/*/placement
 *.kicad*-bak
+*.sublime-*
