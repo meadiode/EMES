@@ -66,6 +66,12 @@ snek: $(BUILD_DIR)
 	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/snek.elf
 
 
+brik: $(BUILD_DIR)
+	$(COMPILE) -c brik.S -o $(BUILD_DIR)/brik.o
+	$(COMPILE) -nostdlib -o $(BUILD_DIR)/brik.elf $(BUILD_DIR)/brik.o
+	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/brik.elf $(BUILD_DIR)/brik.hex
+	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/brik.elf
+
 
 demo_upload: demo
 	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/demo.hex:i
@@ -82,6 +88,10 @@ pong_upload: pong
 snek_upload: snek
 	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/snek.hex:i
 .PHONY: snek_upload
+
+brik_upload: brik
+	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/brik.hex:i
+.PHONY: brik_upload
 
 
 clean:
