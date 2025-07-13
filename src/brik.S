@@ -70,14 +70,10 @@ write_pwm_val:
     cpi r21, (198 + 1)
     brne write_pwm_val
 
-    rcall spawn_shape
+    rcall new_game
 
 main_loop:
     rcall poll_kb
-    sbrs r17, 7
-    rjmp main_loop_cont
-    andi r17, 0b111
-    breq main_loop_cont
 
     lds r27, shape_x
     lds r18, shape_y
@@ -102,7 +98,7 @@ main_loop:
     breq game_loop_key_down
     cpi r17, ((KEY_ROTATE + 1) | 0x80)
     breq game_loop_key_rotate
-    rjmp main_loop_cont
+    rjmp game_loop_cont
 
 game_loop_key_left:
     dec r18
@@ -128,45 +124,23 @@ game_loop_key_rotate:
     sts shape_ptr_next, r16
 
 game_loop_cont:
-; Check if the shape is colliding
-    rcall load_shape
-    ldi r30, lo8(gs(shape_check))
-    ldi r31, hi8(gs(shape_check))
-    rcall process_shape
-    brts game_loop_restore_shape
-    sts shape_x, r27
-    sts shape_y, r18    
-    rjmp game_loop_draw_shape
-
-game_loop_restore_shape:
-    rcall beep
-    clt
-    lds r27, shape_x
-    lds r18, shape_y
-    lds r16, shape_tx_flags
-    lds r17, shape_ptr_next
-    sbrc r16, 2
-    sts shape_ptr, r17
-    sbrs r16, 0
-    rjmp game_loop_draw_shape
-    ldi r16, 0b10
-    sts shape_tx_flags, r16
+    rcall check_and_restore_shape
 
 game_loop_draw_shape:
     rcall load_shape
     ldi r30, lo8(gs(display_set_pixel))
     ldi r31, hi8(gs(display_set_pixel))
-    ldi r22, 0x20
     rcall process_shape
 
     lds r16, shape_tx_flags
-    sbrc r16, 1
+    andi r16, 0b10
+    breq main_loop_cont
+    rcall collapse_full_rows
     rcall spawn_shape
 
 main_loop_cont:
-    ldi r17, 3
+    ldi r17, 0
     rcall looong_delay
-;    rcall beep
 
     rjmp main_loop
 
@@ -404,7 +378,7 @@ display_clear_write_pwm_val:
 poll_kb:
     clr r20 
     clr r21 
-    ldi r17, 4
+    ldi r17, 8
 
 poll_kb_adc_sample_loop:             ; Sample ADC 4 times and store average in r20
     sbi ADCSRA, ADSC
@@ -424,35 +398,37 @@ poll_kb_no_hibyte_inc:
     ror r20
     lsr r21
     ror r20
+    lsr r21
+    ror r20
 
     cpi r20, 40                ; Check if the resulting value corresponds to one of the keys
     brlo poll_kb_key_none
-    cpi r20, 51
+    cpi r20, 51 - 1
     brlo poll_kb_key_1
-    cpi r20, 61
+    cpi r20, 61 - 1
     brlo poll_kb_key_2
-    cpi r20, 73
+    cpi r20, 73 - 1
     brlo poll_kb_key_3
-    cpi r20, 83
+    cpi r20, 83 - 1
     brlo poll_kb_key_4
 
     rjmp poll_kb_key_none            ; No key is pressed 
 
 ; Load key-id into r17
 poll_kb_key_1:
-    ldi r17, (KEY_RIGHT + 1)
+    ldi r17, (KEY_LEFT + 1)
     rjmp poll_kb_update
 
 poll_kb_key_2:
-    ldi r17, (KEY_ROTATE + 1)
+    ldi r17, (KEY_RIGHT + 1)
     rjmp poll_kb_update
 
 poll_kb_key_3:
-    ldi r17, (KEY_DOWN + 1)               
+    ldi r17, (KEY_ROTATE + 1)
     rjmp poll_kb_update
 
 poll_kb_key_4:
-    ldi r17, (KEY_LEFT + 1)
+    ldi r17, (KEY_DOWN + 1)               
     rjmp poll_kb_update
 
 poll_kb_key_none:
@@ -606,6 +582,89 @@ load_shape:
     adc r29, r16
     ret
 
+.global check_and_restore_shape
+check_and_restore_shape:
+; Check if the shape is colliding
+    rcall load_shape
+    ldi r30, lo8(gs(shape_check))
+    ldi r31, hi8(gs(shape_check))
+    rcall process_shape
+    ldi r22, 0x20
+    brts check_and_restore_shape_restore
+    sts shape_x, r27
+    sts shape_y, r18    
+    ret
+
+check_and_restore_shape_restore:
+    rcall beep
+    clt
+    lds r27, shape_x
+    lds r18, shape_y
+    lds r16, shape_tx_flags
+    lds r17, shape_ptr_next
+    sbrc r16, 2
+    sts shape_ptr, r17
+    sbrs r16, 0
+    ret
+    ldi r16, 0b10
+    sts shape_tx_flags, r16
+    ldi r22, 0x05
+    ret
+
+
+.global collapse_row
+; Input: r25 - row index
+; Used register: r16, r17, r19, r20, r21, r22, r23, r24, 25, 26
+collapse_row:
+    ldi r16, 0  ; Column index 
+collapse_row_column_loop:
+    
+    mov r26, r25  ; r26 - row index    
+collapse_row_row_loop:
+    mov r23, r26
+    inc r23
+    mov r24, r16
+    rcall display_get_pixel
+    mov r23, r26
+    rcall display_set_pixel
+
+    inc r26
+    cpi r26, 15
+    brne collapse_row_row_loop
+
+    inc r16
+    cpi r16, 10
+    brne collapse_row_column_loop
+
+    ret
+
+
+.global collapse_full_rows
+collapse_full_rows:
+    ldi r23, 14                 ; Row index
+    
+collapse_full_rows_x_loop:
+    ldi r24, 0                  ; Column index
+collapse_full_rows_y_loop:
+    rcall display_get_pixel
+    cpi r22, 0
+    breq collapse_full_rows_x_loop_cont
+    inc r24
+    cpi r24, 10
+    brne collapse_full_rows_y_loop
+
+    mov r25, r23
+    push r23
+    rcall collapse_row
+    pop r23
+
+collapse_full_rows_x_loop_cont:
+    subi r23, 1
+    brcc collapse_full_rows_x_loop
+
+
+    ret
+
 
 .global rand
 ; Get a very pseudo random value
@@ -641,7 +700,10 @@ rand:
 .global new_game
 ; Call depth: 1
 new_game:
+    ldi r16, 200
+    sts fall_speed, r16
 
+    rcall spawn_shape
     ret
 
 
@@ -777,6 +839,11 @@ kb_stat:
 shape_tx_flags:
     .byte 0x00
 
-seed:
+fall_t:
     .byte 0x00
 
+fall_speed:
+    .byte 0x00
+
+seed:
+    .byte
