@@ -507,7 +507,7 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "",
+      "plot": "power_supply_gerbers/",
       "pos_files": "",
       "specctra_dsn": "",
       "step": "",

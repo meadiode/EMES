@@ -1,9 +1,10 @@
 #include <avr/io.h>
 
-#define KEY_LEFT   0
-#define KEY_RIGHT  1
-#define KEY_DOWN   2
-#define KEY_ROTATE 3
+#define KEY_NONE   0x00
+#define KEY_LEFT   0x02
+#define KEY_RIGHT  0x04
+#define KEY_DOWN   0x08
+#define KEY_ROTATE 0x10
 
 #define SPEAKER_PWM_DUTY 500
 #define SPEAKER_PWM(Hz)  (8000000 / (Hz))  ; Min Hz value: 122
@@ -75,70 +76,33 @@ write_pwm_val:
 main_loop:
     rcall poll_kb
 
-    lds r27, shape_x
-    lds r18, shape_y
+    andi r17, 0x80
+    brne main_loop_move_shape
+    lds r17, fall_t
+    cpi r17, 0
+    brne main_loop_cont
 
-; Erase shape
-    rcall load_shape
-    ldi r30, lo8(gs(display_set_pixel))
-    ldi r31, hi8(gs(display_set_pixel))
-    ldi r22, 0x00
-    sts shape_tx_flags, r22
-    rcall process_shape
-    ld r16, Y
-    sts shape_ptr_next, r16
-
-; Update position from player's input
-    lds r17, kb_stat
-    cpi r17, ((KEY_LEFT + 1) | 0x80)
-    breq game_loop_key_left
-    cpi r17, ((KEY_RIGHT + 1) | 0x80)
-    breq game_loop_key_right
-    cpi r17, ((KEY_DOWN + 1) | 0x80)
-    breq game_loop_key_down
-    cpi r17, ((KEY_ROTATE + 1) | 0x80)
-    breq game_loop_key_rotate
-    rjmp game_loop_cont
-
-game_loop_key_left:
-    dec r18
-    rjmp game_loop_cont
-
-game_loop_key_right:
-    inc r18
-    rjmp game_loop_cont
-
-game_loop_key_down:
-    dec r27
-    ldi r16, 1
-    sts shape_tx_flags, r16
-    rjmp game_loop_cont
-
-game_loop_key_rotate:
-    lds r16, shape_tx_flags
-    ori r16, 0b100
-    sts shape_tx_flags, r16
-    lds r16, shape_ptr
-    lds r17, shape_ptr_next
-    sts shape_ptr, r17
-    sts shape_ptr_next, r16
-
-game_loop_cont:
-    rcall check_and_restore_shape
-
-game_loop_draw_shape:
-    rcall load_shape
-    ldi r30, lo8(gs(display_set_pixel))
-    ldi r31, hi8(gs(display_set_pixel))
-    rcall process_shape
-
+main_loop_move_shape:
+    rcall move_shape
     lds r16, shape_tx_flags
     andi r16, 0b10
     breq main_loop_cont
+    rcall beep
     rcall collapse_full_rows
     rcall spawn_shape
 
 main_loop_cont:
+
+    lds r16, fall_t
+    inc r16
+    lds r17, fall_speed
+    cp r16, r17
+    brlo main_loop_no_fall
+    ldi r16, 0
+
+main_loop_no_fall:
+    sts fall_t, r16
+
     ldi r17, 0
     rcall looong_delay
 
@@ -376,63 +340,45 @@ display_clear_write_pwm_val:
 ; Touched registers: r17, r20, r21, r22
 ; Call depth: 1
 poll_kb:
-    clr r20 
-    clr r21 
-    ldi r17, 8
-
-poll_kb_adc_sample_loop:             ; Sample ADC 4 times and store average in r20
-    sbi ADCSRA, ADSC
+    sbi ADCSRA, ADSC       ; Sample ADC
 
 poll_kb_adc_wait_loop:
     sbic ADCSRA, ADSC
     rjmp poll_kb_adc_wait_loop
-    in r22, ADCL
-    adc r20, r22
-    brcc poll_kb_no_hibyte_inc
-    inc r21
-poll_kb_no_hibyte_inc:
-    dec r17
-    brne poll_kb_adc_sample_loop
-
-    lsr r21                  ; Divide R21-R20 by 4 to find average
-    ror r20
-    lsr r21
-    ror r20
-    lsr r21
-    ror r20
-
-    cpi r20, 40                ; Check if the resulting value corresponds to one of the keys
-    brlo poll_kb_key_none
-    cpi r20, 51 - 1
+    
+    in r20, ADCL
+    cpi r20, 25            ; Check if the resulting value corresponds to one of the keys
     brlo poll_kb_key_1
-    cpi r20, 61 - 1
+    cpi r20, 96
     brlo poll_kb_key_2
-    cpi r20, 73 - 1
+    cpi r20, 154
     brlo poll_kb_key_3
-    cpi r20, 83 - 1
+    cpi r20, 222
     brlo poll_kb_key_4
 
-    rjmp poll_kb_key_none            ; No key is pressed 
-
 ; Load key-id into r17
+poll_kb_key_none:
+    ldi r17, KEY_NONE
+    ldi r16, 40
+    sts fall_speed, r16
+    rjmp poll_kb_update
+
 poll_kb_key_1:
-    ldi r17, (KEY_LEFT + 1)
+    ldi r17, KEY_LEFT
     rjmp poll_kb_update
 
 poll_kb_key_2:
-    ldi r17, (KEY_RIGHT + 1)
+    ldi r17, KEY_RIGHT
     rjmp poll_kb_update
 
 poll_kb_key_3:
-    ldi r17, (KEY_ROTATE + 1)
+    ldi r17, KEY_ROTATE
     rjmp poll_kb_update
 
 poll_kb_key_4:
-    ldi r17, (KEY_DOWN + 1)               
+    ldi r17, KEY_DOWN               
     rjmp poll_kb_update
 
-poll_kb_key_none:
-    ldi r17, 0
 
 poll_kb_update:
     lds r20, kb_stat
@@ -552,9 +498,9 @@ shape_check_ret:
 
 .global spawn_shape
 spawn_shape:
-    ldi r16, 11
+    ldi r16, 13
     sts shape_x, r16
-    ldi r16, 2
+    ldi r16, 3
     sts shape_y, r16
     
     rcall rand
@@ -589,14 +535,13 @@ check_and_restore_shape:
     ldi r30, lo8(gs(shape_check))
     ldi r31, hi8(gs(shape_check))
     rcall process_shape
-    ldi r22, 0x20
+    ldi r22, 0x15
     brts check_and_restore_shape_restore
     sts shape_x, r27
     sts shape_y, r18    
     ret
 
 check_and_restore_shape_restore:
-    rcall beep
     clt
     lds r27, shape_x
     lds r18, shape_y
@@ -655,6 +600,11 @@ collapse_full_rows_y_loop:
 
     mov r25, r23
     push r23
+
+    ldi r30, lo8(tune_row_collapse + 0x4000)
+    ldi r31, hi8(tune_row_collapse + 0x4000)
+    rcall play_tune
+
     rcall collapse_row
     pop r23
 
@@ -662,6 +612,76 @@ collapse_full_rows_x_loop_cont:
     subi r23, 1
     brcc collapse_full_rows_x_loop
 
+    ret
+
+
+.global move_shape
+move_shape:
+    lds r27, shape_x
+    lds r18, shape_y
+
+; Erase shape
+    rcall load_shape
+    ldi r30, lo8(gs(display_set_pixel))
+    ldi r31, hi8(gs(display_set_pixel))
+    ldi r22, 0x00
+    sts shape_tx_flags, r22
+    rcall process_shape
+    ld r16, Y
+    sts shape_ptr_next, r16
+
+; Update position from player's input
+    lds r17, kb_stat
+    cpi r17, (KEY_LEFT | 0x80)
+    breq move_shape_key_left
+    cpi r17, (KEY_RIGHT | 0x80)
+    breq move_shape_key_right
+    cpi r17, (KEY_ROTATE | 0x80)
+    breq move_shape_key_rotate
+    cpi r17, (KEY_DOWN | 0x80)
+    breq move_shape_key_down
+    lds r17, fall_t
+    cpi r17, 0
+    breq move_shape_fall
+
+    rjmp move_shape_cont
+
+move_shape_key_left:
+    dec r18
+    rjmp move_shape_cont
+
+move_shape_key_right:
+    inc r18
+    rjmp move_shape_cont
+
+move_shape_key_rotate:
+    lds r16, shape_tx_flags
+    ori r16, 0b100
+    sts shape_tx_flags, r16
+    lds r16, shape_ptr
+    lds r17, shape_ptr_next
+    sts shape_ptr, r17
+    sts shape_ptr_next, r16
+    rjmp move_shape_cont
+
+move_shape_key_down:
+    ldi r16, 5
+    sts fall_speed, r16
+    rjmp move_shape_cont
+
+move_shape_fall:
+    dec r27
+    ldi r16, 1
+    sts shape_tx_flags, r16
+
+move_shape_cont:
+    rcall check_and_restore_shape
+
+move_shape_draw_shape:
+    rcall load_shape
+    ldi r30, lo8(gs(display_set_pixel))
+    ldi r31, hi8(gs(display_set_pixel))
+    rcall process_shape
 
     ret
 
@@ -700,8 +720,10 @@ rand:
 .global new_game
 ; Call depth: 1
 new_game:
-    ldi r16, 200
+    ldi r16, 40
     sts fall_speed, r16
+    ldi r16, 1
+    sts fall_t, r16
 
     rcall spawn_shape
     ret
@@ -818,6 +840,15 @@ tune_beep:
     .short SPEAKER_PWM(1200)  ; Frequency
 
 
+tune_row_collapse:
+    .byte 2                   ; Number of notes
+    
+    .byte 5                   ; Duration
+    .short SPEAKER_PWM(900)   ; Frequency
+
+    .byte 5                   ; Duration
+    .short SPEAKER_PWM(1500)  ; Frequency
+
 .section .data
 
 
@@ -846,4 +877,4 @@ fall_speed:
     .byte 0x00
 
 seed:
-    .byte
+    .byte 0x00

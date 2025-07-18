@@ -133,11 +133,11 @@
 			(sketchdnponfab yes)
 			(crossoutdnponfab yes)
 			(subtractmaskfromsilk no)
-			(outputformat 5)
+			(outputformat 1)
 			(mirror no)
 			(drillshape 0)
 			(scaleselection 1)
-			(outputdirectory "/home/michael/Downloads/")
+			(outputdirectory "../../../../../projects/emes/kicad/base_board2/base_board2_gerbers")
 		)
 	)
 	(net 0 "")
@@ -4913,7 +4913,7 @@
 		(sheetfile "base_board2.kicad_sch")
 		(attr smd)
 		(fp_arc
-			(start -3.999308 -0.85)
+			(start -3.999307 -0.85)
 			(mid 4.088567 -0.024315)
 			(end -3.988915 0.897506)
 			(stroke

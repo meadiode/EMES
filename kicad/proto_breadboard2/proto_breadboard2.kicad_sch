@@ -2653,16 +2653,6 @@
 	)
 	(wire
 		(pts
-			(xy 111.76 138.43) (xy 111.76 140.335)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "2b68232a-676d-4791-bff9-9737949f3974")
-	)
-	(wire
-		(pts
 			(xy 97.155 161.29) (xy 97.155 172.72)
 		)
 		(stroke
@@ -2993,7 +2983,7 @@
 	)
 	(wire
 		(pts
-			(xy 111.76 147.955) (xy 111.76 149.86)
+			(xy 111.76 138.43) (xy 111.76 149.86)
 		)
 		(stroke
 			(width 0)
@@ -3888,7 +3878,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "2K2"
+		(property "Value" "4K7"
 			(at 113.665 156.845 0)
 			(effects
 				(font
@@ -4543,7 +4533,7 @@
 				)
 			)
 		)
-		(property "Value" "4K7"
+		(property "Value" "510K"
 			(at 118.11 135.255 90)
 			(effects
 				(font
@@ -5035,7 +5025,7 @@
 				)
 			)
 		)
-		(property "Value" "8K2"
+		(property "Value" "12K"
 			(at 105.41 135.255 90)
 			(effects
 				(font
@@ -5452,75 +5442,6 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 111.76 144.145 180)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "f2662a61-566b-4d84-a93d-52c311d6fc6a")
-		(property "Reference" "R8"
-			(at 113.665 142.875 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Value" "2K2"
-			(at 113.665 145.415 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Footprint" ""
-			(at 113.538 144.145 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 111.76 144.145 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 111.76 144.145 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "5e20c7af-f7d9-4091-9efa-480130c52949")
-		)
-		(pin "1"
-			(uuid "d5338747-f488-450d-b479-bb0349af9534")
-		)
-		(instances
-			(project "proto_breadboard"
-				(path "/9121eaa1-199f-4b0a-955e-7211dee87885"
-					(reference "R8")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R")
 		(at 111.76 167.005 180)
 		(unit 1)
 		(exclude_from_sim no)
@@ -5538,7 +5459,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "2K2"
+		(property "Value" "8K2"
 			(at 113.665 168.275 0)
 			(effects
 				(font
@@ -5607,7 +5528,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "8K2"
+		(property "Value" "32K"
 			(at 113.665 179.705 0)
 			(effects
 				(font

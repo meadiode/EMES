@@ -6753,10 +6753,9 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "4d67aa9f-b5a4-4290-9952-7239658d7d88")
 		(property "Reference" "J2"
-			(at 231.775 105.41 0)
+			(at 231.14 106.934 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6771,9 +6770,10 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
+				(hide yes)
 			)
 		)
-		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+		(property "Footprint" "components:Pads_2_54_2x"
 			(at 228.6 105.41 0)
 			(effects
 				(font

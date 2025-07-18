@@ -72,6 +72,16 @@ write_pwm_val:
     cpi r21, (198 + 1)
     brne write_pwm_val
 
+
+
+test_display_read:
+    
+;    ldi r21, 0xfc
+;    rcall display_read_reg
+;    ldi r17, 8
+;    rcall looong_delay
+    ;rjmp test_display_read
+
 main_loop:
     rcall poll_kb
 
@@ -250,12 +260,13 @@ i2c_read_loop:
     brne i2c_read_loop
 
     ; ACK cycle
-    sbi DDRB, SDA
+    cbi DDRB, SDA
     rcall delay
     cbi DDRB, SCL
     rcall delay
     sbi DDRB, SCL
     rcall delay
+    sbi DDRB, SDA
 
     ret
 
@@ -362,45 +373,29 @@ display_read_reg:
 ; Read keyboard
 ; Checks if a key is pressed by sampling analog signal from the keyboard resistor ladder
 ; Output: r26 - key id [1..4], or zero if no key is pressed
-; Touched registers: r17, r20, r21, r22, r26
+; Used registers: r17, r20, r26
 poll_kb:
-    clr r20 
-    clr r21 
-    ldi r17, 4
-
-poll_kb_adc_sample_loop:             ; Sample ADC 4 times and store average in r20
-    sbi ADCSRA, ADSC
+    sbi ADCSRA, ADSC       ; Sample ADC
 
 poll_kb_adc_wait_loop:
     sbic ADCSRA, ADSC
     rjmp poll_kb_adc_wait_loop
-    in r22, ADCL
-    adc r20, r22
-    brcc poll_kb_no_hibyte_inc
-    inc r21
-poll_kb_no_hibyte_inc:
-    dec r17
-    brne poll_kb_adc_sample_loop
-
-    lsr r21                  ; Divide R21-R20 by 4 to find average
-    ror r20
-    lsr r21
-    ror r20
-
-    cpi r20, 40                ; Check if the resulting value corresponds to one of the keys
-    brlo poll_kb_key_none
-    cpi r20, 51
+    
+    in r20, ADCL
+    cpi r20, 25            ; Check if the resulting value corresponds to one of the keys
     brlo poll_kb_key_1
-    cpi r20, 61
+    cpi r20, 96
     brlo poll_kb_key_2
-    cpi r20, 73
+    cpi r20, 154
     brlo poll_kb_key_3
-    cpi r20, 83
+    cpi r20, 222
     brlo poll_kb_key_4
 
-    rjmp poll_kb_key_none            ; No key is pressed 
-
 ; Load key-id into KB_REG and return
+poll_kb_key_none:
+    ldi r17, 0                       ; No key is pressed 
+    rjmp poll_kb_update_r26
+
 poll_kb_key_1:                       ; UP key
     ldi r17, (DIR_UP + 1)
     rjmp poll_kb_update_r26
@@ -416,9 +411,6 @@ poll_kb_key_3:                       ; LEFT key
 poll_kb_key_4:                       ; RIGHT key
     ldi r17, (DIR_RIGHT + 1)
     rjmp poll_kb_update_r26
-
-poll_kb_key_none:
-    ldi r17, 0
 
 poll_kb_update_r26:
     mov r20, KB_REG
