@@ -44,12 +44,19 @@ demo: $(BUILD_DIR)
 	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/demo.elf $(BUILD_DIR)/demo.hex
 	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/demo.elf
 
+demo_upload: demo
+	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/demo.hex:i
+.PHONY: demo_upload
 
 test_util: $(BUILD_DIR)
 	$(COMPILE) -c test_util.S -o $(BUILD_DIR)/test_util.o
 	$(COMPILE) -nostdlib -o $(BUILD_DIR)/test_util.elf $(BUILD_DIR)/test_util.o
 	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/test_util.elf $(BUILD_DIR)/test_util.hex
 	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/test_util.elf
+
+test_util_upload: test_util
+	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/test_util.hex:i
+.PHONY: test_util_upload
 
 
 pong: $(BUILD_DIR)
@@ -58,6 +65,9 @@ pong: $(BUILD_DIR)
 	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/pong.elf $(BUILD_DIR)/pong.hex
 	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/pong.elf
 
+pong_upload: pong
+	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/pong.hex:i
+.PHONY: pong_upload
 
 snek: $(BUILD_DIR)
 	$(COMPILE) -c snek.S -o $(BUILD_DIR)/snek.o
@@ -65,6 +75,9 @@ snek: $(BUILD_DIR)
 	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/snek.elf $(BUILD_DIR)/snek.hex
 	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/snek.elf
 
+snek_upload: snek
+	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/snek.hex:i
+.PHONY: snek_upload
 
 brik: $(BUILD_DIR)
 	$(COMPILE) -c brik.S -o $(BUILD_DIR)/brik.o
@@ -72,29 +85,21 @@ brik: $(BUILD_DIR)
 	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/brik.elf $(BUILD_DIR)/brik.hex
 	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/brik.elf
 
-
-demo_upload: demo
-	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/demo.hex:i
-.PHONY: demo_upload
-
-test_util_upload: test_util
-	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/test_util.hex:i
-.PHONY: test_util_upload
-
-pong_upload: pong
-	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/pong.hex:i
-.PHONY: pong_upload
-
-snek_upload: snek
-	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/snek.hex:i
-.PHONY: snek_upload
-
 brik_upload: brik
 	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/brik.hex:i
 .PHONY: brik_upload
+
+egg: $(BUILD_DIR)
+	$(COMPILE) -c egg.S -o $(BUILD_DIR)/egg.o
+	$(COMPILE) -nostdlib -o $(BUILD_DIR)/egg.elf $(BUILD_DIR)/egg.o
+	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/egg.elf $(BUILD_DIR)/egg.hex
+	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/egg.elf
+
+egg_upload: egg
+	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/egg.hex:i
+.PHONY: egg_upload
 
 
 clean:
 	$(RM) -rf $(BUILD_DIR)
 .PHONY: clean
-
