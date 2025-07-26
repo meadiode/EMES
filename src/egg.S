@@ -1,19 +1,16 @@
 #include <avr/io.h>
 
 #define KEY_NONE  0x00
-#define KEY_LUP   0x02
-#define KEY_LDOWN 0x04
-#define KEY_RUP   0x08
-#define KEY_RDOWN 0x10
-
-#define WOLF_LEFT_UP     (19 * 0)
-#define WOLF_LEFT_DOWN   (19 * 1)
-#define WOLF_RIGHT_UP    (19 * 2)
-#define WOLF_RIGHT_DOWN  (19 * 3)
-
+#define KEY_LUP   0x01
+#define KEY_LDOWN 0x02
+#define KEY_RUP   0x03
+#define KEY_RDOWN 0x04
 
 #define SPEAKER_PWM_DUTY 500
 #define SPEAKER_PWM(Hz)  (8000000 / (Hz))  ; Min Hz value: 122
+
+#define WOLF_VALUE 0x20
+#define EGG_VALUE  0x05
 
 #define ADDR_W 0x40
 #define ADDR_R 0x41
@@ -38,9 +35,15 @@ main:
     out DDRB, r17                                            ; Set B1 as output
 
     out PORTB, r16                                           ; All pins low
-
+   
     ldi r17, ((1 << WGM03) | (1 << WGM02) | (1 << CS00))     ; Set up timer's fast PWM mode
-    out TCCR0B, r17
+    out TCCR0B, r17   
+
+    ldi r18, hi8(500)     ; Speaker's PWM duty cycle 
+    ldi r19, lo8(500)
+    out OCR0BH, r18
+    out OCR0BL, r19
+
 
     ldi r23, 2
     rcall display_set_reg_page
@@ -88,6 +91,17 @@ main_loop:
     ldi r17, 39
     rcall long_delay
 
+    lds r16, sound_t
+    cpi r16, 0
+    breq main_loop_cont
+    dec r16
+    sts sound_t, r16
+    brne main_loop_cont
+
+    ldi r17, 1 << COM0B1  ; Disable PWM output
+    out TCCR0A, r17
+
+main_loop_cont:
     rjmp main_loop
 
 
@@ -180,38 +194,6 @@ i2c_write_loop_cont:
     ret
 
 
-.global i2c_read
-; Outputs: r22 - read data byte
-; Used registers: r17, r19, r21, r22
-; Call depth: 1
-i2c_read:
-    cbi DDRB, SDA
-    ldi r22, 0
-    ldi r19, 8
-i2c_read_loop:
-    lsl r22
-    cbi DDRB, SCL
-    nop
-    in r21, PINB
-    sbrc r21, 3
-    inc r22
-    sbi DDRB, SCL
-    nop
-    dec r19
-    brne i2c_read_loop
-
-    ; ACK cycle
-    cbi DDRB, SDA
-    sbi PORTB, SDA
-    nop
-    cbi DDRB, SCL
-    nop
-    sbi DDRB, SCL
-    nop
-    cbi PORTB, SDA
-    ret
-
-
 .global display_write_reg
 ; Inputs: r21 - register address; r22 - register value
 ; Used registers: r17, r19, r20, r21, r22
@@ -225,28 +207,6 @@ display_write_reg:
     mov r20, r22
     rcall i2c_write
     rcall i2c_stop
-    ret
-
-
-.global display_read_reg
-; Inputs: r21 - register address
-; Outputs r22 - register value
-; Used registers: r17, r19, r20, r21, r22
-; Call depth: 2
-display_read_reg:
-    rcall i2c_start
-    ldi r20, ADDR_W
-    rcall i2c_write    
-    mov r20, r21
-    rcall i2c_write
-    rcall i2c_stop
-
-    rcall i2c_start
-    ldi r20, ADDR_R
-    rcall i2c_write
-    rcall i2c_read
-    rcall i2c_stop
-
     ret
 
 
@@ -277,23 +237,6 @@ display_set_pixel:
     add r21, r23    ; Adding x
     inc r21         ; Adding 1
     rcall display_write_reg
-
-    ret
-
-
-.global display_get_pixel
-; inputs: r23 - x; r24 - y
-; Outputs: r22 - pixel value
-; Used registers: r17, r19, r20, r21, r22, r23, r24
-; Call depth: 3
-display_get_pixel:
-    mov r21, r24    ; Calculate PWM register id as [y * 18 + x + 1]
-    swap r21        ; Multiply y by 18
-    add r21, r24
-    add r21, r24
-    add r21, r23    ; Adding x
-    inc r21         ; Adding 1
-    rcall display_read_reg
 
     ret
 
@@ -345,19 +288,19 @@ poll_kb_key_none:
     rjmp poll_kb_update
 
 poll_kb_key_1:
-    ldi r17, KEY_LDOWN
-    rjmp poll_kb_update
-
-poll_kb_key_2:
     ldi r17, KEY_LUP
     rjmp poll_kb_update
 
+poll_kb_key_2:
+    ldi r17, KEY_LDOWN
+    rjmp poll_kb_update
+
 poll_kb_key_3:
-    ldi r17, KEY_RDOWN
+    ldi r17, KEY_RUP
     rjmp poll_kb_update
 
 poll_kb_key_4:
-    ldi r17, KEY_RUP               
+    ldi r17, KEY_RDOWN               
     rjmp poll_kb_update
 
 
@@ -371,6 +314,27 @@ poll_kb_update:
 poll_kb_key_change:
     ori r17, 0x80         ; Set MSB to indicate that it's a different key now
     sts kb_stat, r17
+    ret
+
+
+
+.global play_sound
+play_sound:
+    ldi r17, ((1 << COM0B1) | (1 << WGM01))   ; Enable PWM output
+    out TCCR0A, r17
+
+    ldi r23, hi8(500)     ; Speaker's PWM duty cycle 
+    ldi r24, lo8(500)
+    out OCR0BH, r23
+    out OCR0BL, r24
+    
+    ld r23, X+            ; Frequncy hi byte   
+    ld r24, X             ; Frequncy low byte
+    out ICR0H, r24
+    out ICR0L, r23
+
+    sts sound_t, r22
+    
     ret
 
 
@@ -410,6 +374,7 @@ beep:
     rcall play_tune
 
     ret
+
 
 
 .global rand
@@ -478,53 +443,86 @@ display_blit_img_15x10_x_loop_cont:
     ret
 
 
+.global display_blit_img_3x5
+; Inputs: r27 - x offset; r28 - y offset; r22 - pixel value; Z(r31, r30) - bitmap address
+; Used registers: r16, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31
+; Call depth: 4
+display_blit_img_3x5:
+    mov r24, r28 ; r24 - y
+    ldi r25, 8 ; r25 - bit counter
+
+display_blit_img_3x5_y_loop:
+    mov r23, r27 ; r23 - x
+display_blit_img_3x5_x_loop:
+    cpi r25, 8  ; Check if all bits in the current byte are read
+    brne display_blit_img_3x5_put_pixel
+    ldi r25, 0
+    ld r26, Z+  ; Fetch the next byte if the current one ended
+
+display_blit_img_3x5_put_pixel:
+    sbrs r26, 7
+    rjmp display_blit_img_3x5_x_loop_cont
+    rcall display_set_pixel
+
+display_blit_img_3x5_x_loop_cont:
+    inc r25
+    lsl r26
+    inc r23
+    mov r16, r23
+    sub r16, r27
+    cpi r16, 3
+    brlo display_blit_img_3x5_x_loop
+
+    inc r24
+    mov r16, r24
+    sub r16, r28
+    cpi r16, 5
+    brlo display_blit_img_3x5_y_loop
+
+    ret
+
+
 .global update_wolf
 update_wolf:
     ;lds r17, kb_stat
     sbrs r17, 7                ; Check if key-down
     rjmp update_wolf_ret
 
-    cpi r17, (KEY_LUP | 0x80)
-    breq update_wolf_left_up
-    cpi r17, (KEY_LDOWN | 0x80)
-    breq update_wolf_left_down
-    cpi r17, (KEY_RUP | 0x80)
-    breq update_wolf_right_up
-    cpi r17, (KEY_RDOWN | 0x80)
-    breq update_wolf_right_down
-    rjmp update_wolf_ret
-
-update_wolf_left_up:
-    ldi r27, WOLF_LEFT_UP
-    rjmp update_wolf_draw
-
-update_wolf_left_down:
-    ldi r27, WOLF_LEFT_DOWN
-    rjmp update_wolf_draw
-
-update_wolf_right_up:
-    ldi r27, WOLF_RIGHT_UP
-    rjmp update_wolf_draw
-
-update_wolf_right_down:
-    ldi r27, WOLF_RIGHT_DOWN
+    andi r17, 0x7f
+    breq update_wolf_ret
+    dec r17
+    mov r27, r17
 
 update_wolf_draw:
-    ldi r30, lo8(img_wolf_ld + 0x4000)
-    ldi r31, hi8(img_wolf_ld + 0x4000)
-    lds r16, wolf_pos
+    ldi r30, lo8(img_wolf_lu + 0x4000)
+    ldi r31, hi8(img_wolf_lu + 0x4000)
+    lds r17, wolf_pos
+    
+    mov r16, r17
+    swap r16                   ; Mutiply wolf_pos by 19 to get sprite offset
+    add r16, r17
+    add r16, r17
+    add r16, r17
+
     add r30, r16
     ldi r16, 0
     adc r31, r16
     ldi r22, 0
     rcall display_blit_img_15x10  ; Erase previous wolf sprite
 
-    ldi r30, lo8(img_wolf_ld + 0x4000)
-    ldi r31, hi8(img_wolf_ld + 0x4000)
-    add r30, r27
+    ldi r30, lo8(img_wolf_lu + 0x4000)
+    ldi r31, hi8(img_wolf_lu + 0x4000)
+
+    mov r16, r27
+    swap r16                   ; Mutiply r27(new wolf_pos) by 19 to get sprite offset
+    add r16, r27
+    add r16, r27
+    add r16, r27
+
+    add r30, r16
     ldi r16, 0
     adc r31, r16
-    ldi r22, 0x20
+    ldi r22, WOLF_VALUE
     rcall display_blit_img_15x10 ; Draw wolf sprite
 
     sts wolf_pos, r27
@@ -534,15 +532,19 @@ update_wolf_ret:
 
 
 .global update_chutes
+; Used registers: r16, r17, r18, r19, r20, r21, r26, r27, r28, r29, r30, r31
 update_chutes:
-
     ldi r28, lo8(chutes)     ; Y - chute state address
     ldi r29, hi8(chutes)
 
     ldi r30, lo8(chutes_t)   ; Z - chute timer address
     ldi r31, hi8(chutes_t)
 
-    ldi r16, 4               ; r16 - chute index
+    ldi r26, lo8(chute_beeps + 0x4000)  ; X - chute egg-moving sound address
+    ldi r27, hi8(chute_beeps + 0x4000)
+
+
+    ldi r16, 0               ; r16 - chute index
 update_chutes_loop:
     ld r19, Y
     ld r20, Z
@@ -550,10 +552,41 @@ update_chutes_loop:
     st Z+, r20
     brne update_chutes_loop_cont  ; If a chute's timer didn't roll over, go to the next chute
                                   ; Else, move the eggs and spawn a new one (or not)
-    lsr r19
-
-; check if the egg is catched or dropped here 
+    lsr r19    
+    brcc update_chutes_loop_check_sound 
     
+    lds r22, wolf_pos             ; Check if the egg is catched or dropped
+    cp r16, r22
+    breq update_chutes_loop_egg_catched
+
+    rcall broken_egg
+    ret
+
+update_chutes_loop_egg_catched:
+    lds r22, score
+    inc r22
+    sts score, r22
+    ldi r26, lo8(catch_beep + 0x4000)
+    ldi r27, hi8(catch_beep + 0x4000)
+    ldi r22, 15
+    rcall play_sound
+
+    rjmp update_chutes_loop_play_sound
+
+update_chutes_loop_check_sound:
+    mov r22, r19
+    andi r22, 0b11111
+    breq update_chutes_loop_spawn  ; If a chute is empty, then don't do sounds for it
+
+update_chutes_loop_play_sound:
+    lds r22, sound_t
+    cpi r22, 0
+    brne update_chutes_loop_spawn
+    ldi r22, 5
+    rcall play_sound
+    ld r22, -X
+
+update_chutes_loop_spawn:
     sbrc r19, 6
     rjmp update_chutes_loop_cont  ; Skip if an egg was spawned previously
     
@@ -564,8 +597,12 @@ update_chutes_loop:
     ori r19, 0b10000000           ; Egg spawned
 
 update_chutes_loop_cont:
+    ld r22, X+
+    ld r22, X+
+
     st Y+, r19
-    dec r16
+    inc r16
+    cpi r16, 4
     brne update_chutes_loop
     ret
 
@@ -591,7 +628,7 @@ draw_chutes_chute_loop:
     ldi r22, 0x00
     lsr r25
     brcc draw_chutes_chute_loop_draw_egg
-    ldi r22, 0x10
+    ldi r22, EGG_VALUE
 
 draw_chutes_chute_loop_draw_egg:
     rcall display_set_pixel
@@ -602,6 +639,39 @@ draw_chutes_chute_loop_draw_egg:
     dec r16
     brne draw_chutes_loop
 
+    ret
+
+
+.global broken_egg
+broken_egg:
+    ldi r26, lo8(miss_beep + 0x4000)
+    ldi r27, hi8(miss_beep + 0x4000)
+    rcall play_sound
+    ldi r17, 19
+    rcall looong_delay
+    ldi r17, 1 << COM0B1  ; Disable PWM output
+    out TCCR0A, r17
+
+    ldi r28, 5
+
+    sbrc r16, 1
+    ldi r27, 11
+    sbrs r16, 1
+    ldi r27, 1
+
+    ldi r18, 6
+broken_egg_loop:
+    ldi r30, lo8(img_broken_egg + 0x4000)
+    ldi r31, hi8(img_broken_egg + 0x4000)
+    ldi r22, 0x20
+    
+    rcall display_blit_img_3x5
+
+    dec r18
+    brne broken_egg_loop    
+
+
+broken_egg_ret:
     ret
 
 
@@ -623,11 +693,19 @@ new_game_init_loop:
     dec r16
     brne new_game_init_loop
 
+    ldi r16, 0b01000000
+    sts chute_lu, r16
+    ldi r16, 0b10000000
+    sts chute_ld, r16
+
     sts score, r19
     ldi r16, 24
     sts prob, r16
     ldi r16, 3
     sts lives, r16
+
+    ldi r17, 0x81
+    rcall update_wolf
 
     ret
 
@@ -641,47 +719,85 @@ tune_beep:
     .byte 4                   ; Duration
     .short SPEAKER_PWM(1200)  ; Frequency
 
+chute_beeps:
+    .short SPEAKER_PWM(1400)
+    .short SPEAKER_PWM(1800)
+    .short SPEAKER_PWM(2200)
+    .short SPEAKER_PWM(2600)
 
-; 15x10
-img_wolf_ld:
-    .byte 0b00000011
-    .byte 0b00000000
-    .byte 0b00001110
-    .byte 0b10000000
-    .byte 0b00001101
-    .byte 0b00000000
-    .byte 0b00001010
-    .byte 0b00000000
-    .byte 0b00111000
-    .byte 0b00000000
-    .byte 0b10100000
-    .byte 0b00000110
-    .byte 0b01000000
-    .byte 0b00000001
-    .byte 0b10000000
-    .byte 0b00000101
-    .byte 0b00000000
-    .byte 0b00011011
-    .byte 0b00000000
+catch_beep:
+    .short SPEAKER_PWM(400)
+
+miss_beep:
+    .short SPEAKER_PWM(300)
+
+count_beep:
+    .short SPEAKER_PWM(3000)
 
 
 ; 15x10
 img_wolf_lu:
-    .byte 0b00000011
+    .byte 0b00000010
+    .byte 0b10000000
+    .byte 0b00000111
     .byte 0b00000000
-    .byte 0b00001110
+    .byte 0b00011100
     .byte 0b00000000
-    .byte 0b00001100
+    .byte 0b11001000
+    .byte 0b00000001
+    .byte 0b11110000
     .byte 0b00000000
-    .byte 0b01001000
+    .byte 0b01101000
     .byte 0b00000000
-    .byte 0b01111000
-    .byte 0b00000000
-    .byte 0b00101000
-    .byte 0b00000000
-    .byte 0b01010000
+    .byte 0b01100000
     .byte 0b00000001
     .byte 0b10000000
+    .byte 0b00000010
+    .byte 0b10000000
+    .byte 0b00001101
+    .byte 0b10000000
+
+
+; 15x10
+img_wolf_ld:
+    .byte 0b00000010
+    .byte 0b10000000
+    .byte 0b00000111
+    .byte 0b00000000
+    .byte 0b00011100
+    .byte 0b00000000
+    .byte 0b00001000
+    .byte 0b00000000
+    .byte 0b00110000
+    .byte 0b00000000
+    .byte 0b11101000
+    .byte 0b00000011
+    .byte 0b01100000
+    .byte 0b00001101
+    .byte 0b10000000
+    .byte 0b00011010
+    .byte 0b10000000
+    .byte 0b00001101
+    .byte 0b10000000
+
+
+; 15x10
+img_wolf_ru:
+    .byte 0b00000010
+    .byte 0b10000000
+    .byte 0b00000111
+    .byte 0b00000000
+    .byte 0b00000111
+    .byte 0b00000000
+    .byte 0b00001001
+    .byte 0b10000000
+    .byte 0b00011111
+    .byte 0b00000000
+    .byte 0b10110000
+    .byte 0b00000000
+    .byte 0b11000000
+    .byte 0b00000000
+    .byte 0b11000000
     .byte 0b00000010
     .byte 0b10000000
     .byte 0b00001101
@@ -690,46 +806,23 @@ img_wolf_lu:
 
 ; 15x10
 img_wolf_rd:
-    .byte 0b00000001
-    .byte 0b10000000
-    .byte 0b00001011
-    .byte 0b10000000
-    .byte 0b00010110
-    .byte 0b00000000
-    .byte 0b00101000
-    .byte 0b00000000
-    .byte 0b00111000
-    .byte 0b00000000
-    .byte 0b00101000
-    .byte 0b00000000
-    .byte 0b01001100
-    .byte 0b00000000
-    .byte 0b11000000
     .byte 0b00000010
     .byte 0b10000000
     .byte 0b00000111
-    .byte 0b10000000
-
-
-; 15x10
-img_wolf_ru:
-    .byte 0b00000001
-    .byte 0b10000000
-    .byte 0b00000011
-    .byte 0b10000000
-    .byte 0b00000110
     .byte 0b00000000
-    .byte 0b00001001
+    .byte 0b00000111
     .byte 0b00000000
-    .byte 0b00111100
+    .byte 0b00001000
     .byte 0b00000000
-    .byte 0b10100000
-    .byte 0b00000001
-    .byte 0b01000000
+    .byte 0b00011000
     .byte 0b00000000
-    .byte 0b11000000
+    .byte 0b10111000
+    .byte 0b00000000
+    .byte 0b11011000
+    .byte 0b00000000
+    .byte 0b11011000
     .byte 0b00000010
-    .byte 0b10000000
+    .byte 0b10110000
     .byte 0b00001101
     .byte 0b10000000
 
@@ -738,31 +831,97 @@ img_wolf_ru:
 chute_paths:
 chute_path_lu:
     .byte ((2 << 4) | 3)
-    .byte ((2 << 4) | 2)
     .byte ((1 << 4) | 2)
     .byte ((1 << 4) | 1)
+    .byte ((0 << 4) | 1)
     .byte ((0 << 4) | 0)
 
 chute_path_ld:
     .byte ((6 << 4) | 3)
-    .byte ((6 << 4) | 2)
     .byte ((5 << 4) | 2)
     .byte ((5 << 4) | 1)
+    .byte ((4 << 4) | 1)
     .byte ((4 << 4) | 0)
 
 chute_path_ru:
     .byte ((2 << 4) | 11)
-    .byte ((2 << 4) | 12)
     .byte ((1 << 4) | 12)
     .byte ((1 << 4) | 13)
+    .byte ((0 << 4) | 13)
     .byte ((0 << 4) | 14)
 
 chute_path_rd:
     .byte ((6 << 4) | 11)
-    .byte ((6 << 4) | 12)
     .byte ((5 << 4) | 12)
     .byte ((5 << 4) | 13)
+    .byte ((4 << 4) | 13)
     .byte ((4 << 4) | 14)
+
+
+; 3x5
+img_digit_thin_0:
+    .byte 0b11010110
+    .byte 0b11010110
+
+
+; 3x5
+img_digit_thin_1:
+    .byte 0b01011001
+    .byte 0b00101110
+
+
+; 3x5
+img_digit_thin_2:
+    .byte 0b11100111
+    .byte 0b11001110
+
+
+; 3x5
+img_digit_thin_3:
+    .byte 0b11100111
+    .byte 0b10011110
+
+
+; 3x5
+img_digit_thin_4:
+    .byte 0b10110111
+    .byte 0b10010010
+
+
+; 3x5
+img_digit_thin_5:
+    .byte 0b11110011
+    .byte 0b10011110
+
+
+; 3x5
+img_digit_thin_6:
+    .byte 0b11110011
+    .byte 0b11011110
+
+
+; 3x5
+img_digit_thin_7:
+    .byte 0b11100101
+    .byte 0b00100100
+
+
+; 3x5
+img_digit_thin_8:
+    .byte 0b11110111
+    .byte 0b11011110
+
+
+; 3x5
+img_digit_thin_9:
+    .byte 0b11110111
+    .byte 0b10011110
+
+; 3x5
+img_broken_egg:
+    .byte 0b00000000
+    .byte 0b00101110
+
 
 
 .section .data
@@ -785,6 +944,9 @@ score:
 lives:
     .byte 0x00
 
+sound_t:
+    .byte 0x00
+
 chutes:
 
 chute_lu:
@@ -795,7 +957,6 @@ chute_ru:
     .byte 0x00
 chute_rd:
     .byte 0x00
-
 
 chutes_t:
 
