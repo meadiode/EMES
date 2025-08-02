@@ -519,7 +519,7 @@
       "plot": "../../../../../projects/emes/kicad/base_board2/base_board2_gerbers",
       "pos_files": "",
       "specctra_dsn": "",
-      "step": "",
+      "step": "../../3dcad/housing/base_board2.step",
       "svg": "",
       "vrml": ""
     },

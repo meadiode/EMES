@@ -87,6 +87,7 @@ main_loop:
     rcall update_wolf
     rcall update_chutes
     rcall draw_chutes
+    rcall broken_egg
 
     ldi r17, 39
     rcall long_delay
@@ -276,7 +277,7 @@ poll_kb_adc_wait_loop:
     brlo poll_kb_key_1
     cpi r20, 96
     brlo poll_kb_key_2
-    cpi r20, 154
+    cpi r20, 195
     brlo poll_kb_key_3
     cpi r20, 222
     brlo poll_kb_key_4
@@ -292,15 +293,15 @@ poll_kb_key_1:
     rjmp poll_kb_update
 
 poll_kb_key_2:
-    ldi r17, KEY_LDOWN
-    rjmp poll_kb_update
-
-poll_kb_key_3:
     ldi r17, KEY_RUP
     rjmp poll_kb_update
 
-poll_kb_key_4:
+poll_kb_key_3:
     ldi r17, KEY_RDOWN               
+    rjmp poll_kb_update
+
+poll_kb_key_4:
+    ldi r17, KEY_LDOWN
     rjmp poll_kb_update
 
 
@@ -559,8 +560,10 @@ update_chutes_loop:
     cp r16, r22
     breq update_chutes_loop_egg_catched
 
-    rcall broken_egg
-    ret
+    mov r22, r16
+    ori r22, 0x80
+    sts missed_side, r22
+    rjmp update_chutes_loop_spawn
 
 update_chutes_loop_egg_catched:
     lds r22, score
@@ -644,6 +647,11 @@ draw_chutes_chute_loop_draw_egg:
 
 .global broken_egg
 broken_egg:
+    lds r16, missed_side
+    sbrs r16, 7
+    rjmp broken_egg_ret
+
+
     ldi r26, lo8(miss_beep + 0x4000)
     ldi r27, hi8(miss_beep + 0x4000)
     rcall play_sound
@@ -658,18 +666,40 @@ broken_egg:
     ldi r27, 11
     sbrs r16, 1
     ldi r27, 1
+    ldi r16, 0
+    sts missed_side, r16
 
     ldi r18, 6
 broken_egg_loop:
+
     ldi r30, lo8(img_broken_egg + 0x4000)
     ldi r31, hi8(img_broken_egg + 0x4000)
     ldi r22, 0x20
-    
     rcall display_blit_img_3x5
 
-    dec r18
-    brne broken_egg_loop    
+    push r27
+    ldi r26, lo8(count_beep + 0x4000)
+    ldi r27, hi8(count_beep + 0x4000)
+    rcall play_sound
+    pop r27
 
+    push r18
+    ldi r17, 3
+    rcall looong_delay
+    ldi r17, 1 << COM0B1  ; Disable PWM output
+    out TCCR0A, r17
+
+    ldi r30, lo8(img_broken_egg + 0x4000)
+    ldi r31, hi8(img_broken_egg + 0x4000)
+    ldi r22, 0x00
+    rcall display_blit_img_3x5
+
+    ldi r17, 19
+    rcall looong_delay
+
+    pop r18
+    dec r18
+    brne broken_egg_loop
 
 broken_egg_ret:
     ret
@@ -699,6 +729,7 @@ new_game_init_loop:
     sts chute_ld, r16
 
     sts score, r19
+    sts missed_side, r19
     ldi r16, 24
     sts prob, r16
     ldi r16, 3
@@ -945,6 +976,9 @@ lives:
     .byte 0x00
 
 sound_t:
+    .byte 0x00
+
+missed_side:
     .byte 0x00
 
 chutes:

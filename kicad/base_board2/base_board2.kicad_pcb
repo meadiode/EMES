@@ -19667,7 +19667,7 @@
 				(type default)
 			)
 			(layer "Edge.Cuts")
-			(uuid "a67337c0-8b70-4f31-a91f-294a96e230cc")
+			(uuid "907be863-d02a-40b4-9dd1-a96bf1abb8d4")
 		)
 		(fp_line
 			(start -1.6 -1.3)
@@ -19677,7 +19677,7 @@
 				(type default)
 			)
 			(layer "Edge.Cuts")
-			(uuid "af090456-d171-4410-a3ca-f915491712a5")
+			(uuid "58d708e1-5750-45ff-9ef7-a085c3f4e392")
 		)
 		(fp_line
 			(start 8.6 -8.1)
@@ -19687,7 +19687,7 @@
 				(type default)
 			)
 			(layer "Edge.Cuts")
-			(uuid "e8f2fdbf-5759-4c6d-ae9a-be0e5053f76c")
+			(uuid "4fbecc08-1c49-47a5-b85c-3991a3bcb650")
 		)
 		(fp_line
 			(start 9.1 -1.8)
@@ -19697,7 +19697,7 @@
 				(type default)
 			)
 			(layer "Edge.Cuts")
-			(uuid "9720910e-8ca4-4160-a044-159f1fff8fa8")
+			(uuid "ccb47519-7aa9-49f2-ba0b-7cf2b01c1de7")
 		)
 		(fp_arc
 			(start -2.1 -7.6)
@@ -19708,7 +19708,7 @@
 				(type default)
 			)
 			(layer "Edge.Cuts")
-			(uuid "67d84f5b-84de-42ca-b6a5-bcee6f93d5d5")
+			(uuid "2bead721-a0f0-4f24-b972-cb365b99b92d")
 		)
 		(fp_arc
 			(start -1.6 -1.3)
@@ -19719,7 +19719,7 @@
 				(type default)
 			)
 			(layer "Edge.Cuts")
-			(uuid "6c054c41-bb63-4ac1-934b-ee23e66867e6")
+			(uuid "60a408bb-90c2-4d33-8a7a-4ad2df95482c")
 		)
 		(fp_arc
 			(start 8.6 -8.1)
@@ -19730,7 +19730,7 @@
 				(type default)
 			)
 			(layer "Edge.Cuts")
-			(uuid "bf1deeb8-15db-4b40-a70b-e25cdb6cbedf")
+			(uuid "80bd4cf7-d4f2-4994-bf31-4a100a8602ad")
 		)
 		(fp_arc
 			(start 9.1 -1.8)
@@ -19741,7 +19741,7 @@
 				(type default)
 			)
 			(layer "Edge.Cuts")
-			(uuid "2327e9ac-1b89-4b41-ae2c-dffb9c6ee4ac")
+			(uuid "18fadd65-17d3-4f14-8082-20acd72a60f4")
 		)
 		(pad "1" smd rect
 			(at 0 0)
@@ -19824,15 +19824,15 @@
 			(uuid "355208b6-cbde-4184-906e-acf198778010")
 		)
 		(embedded_fonts no)
-		(model "/home/michael/Downloads/LIB_009159008603906/009159008603906/3D/009159008603906.stp"
+		(model "/home/michael/projects/kicad_libraries/models/009159008603906.stp"
 			(offset
-				(xyz 3.5 -4.7 -4.5)
+				(xyz 3.5 -4.75 -5)
 			)
 			(scale
-				(xyz 1 1 1)
+				(xyz 1 1 1.1)
 			)
 			(rotate
-				(xyz 180 0 0)
+				(xyz -180 -0 -0)
 			)
 		)
 	)

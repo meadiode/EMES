@@ -510,7 +510,7 @@
       "plot": "power_supply_gerbers/",
       "pos_files": "",
       "specctra_dsn": "",
-      "step": "",
+      "step": "../../3dcad/housing/power_supply.step",
       "svg": "",
       "vrml": ""
     },
