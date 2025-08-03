@@ -1,5 +1,5 @@
 import cadquery as cq
-from cadquery.vis import show, style
+from xvis import show, style
 from cadquery.occ_impl.shapes import edgesToWires
 from os.path import abspath, dirname
 
@@ -21,9 +21,10 @@ MIDDLE_OFFSET = BOTTOM_H + MIDDLE_H
 DISP_FILTER_SX = 19.0
 DISP_FILTER_SY = 12.0
 DISP_FILTER_TH = 1.1
-DISP_FILTER_H_OFFSET = 0.5
+DISP_FILTER_H_OFFSET = 1.0
 
 BUTTON_D = 5.0
+BUTTONS_OFFSET = 1.5
 
 if __name__ == '__main__':
 
@@ -101,14 +102,14 @@ if __name__ == '__main__':
             .faces('>Z')
             .workplane()
             .pushPoints(screws_xy)
-            .circle((2.0 + TOL) / 2)
+            .circle((2.4) / 2)
             .cutBlind(-(HOUSING_H - 1.0))
             
             # Heat inserts bores
             .faces('>Z')
             .workplane(offset=-(HOUSING_H - 1.0))
             .pushPoints(screws_xy)
-            .circle(3.6 / 2)
+            .circle(3.5 / 2)
             .cutBlind(3.0)
 
             # Screw heads bores
@@ -171,8 +172,8 @@ if __name__ == '__main__':
 
     speaker_grill_cutout = \
         (cq.Workplane('YZ')
-            .pushPoints(((0, 0), (0, -1), (0, -2), (0, 1), (0, 2)))
-            .slot2D(5.0, 0.6)
+            .pushPoints(((0, 0), (0, -1.5), (0, -3), (0, 1.5), (0, 3)))
+            .slot2D(7.0, 0.8)
             .extrude(10.0, both=True)
             .rotate((0, 0, 0), (1, 0, 0), 45.0)
             .intersect((cq.Workplane('YZ')
@@ -195,7 +196,7 @@ if __name__ == '__main__':
             .add(pcb_outline.translate((0, 0, MIDDLE_OFFSET)))
             .wires()
             .toPending()
-            .offset2D(-0.4)
+            .offset2D(-0.2)
             .cutThruAll()
             
             .workplane()
@@ -239,10 +240,29 @@ if __name__ == '__main__':
             .eachpoint(button)
             .translate((0, 0, MIDDLE_OFFSET + 1.3)))
 
+
+    class RadiusSelector(cq.Selector):
+
+        def __init__(self, rmin, rmax):
+            self.rmin = rmin
+            self.rmax = rmax
+
+        def filter(self, objs):
+            res = []
+            for obj in objs:
+                try:
+                    if self.rmin <= obj.radius() <= self.rmax:
+                        res.append(obj)
+                except:
+                    pass
+            return res
+
     housing_top = \
         (housing_whole
             .split(cq.Face.makePlane(basePnt=(0, 0, MIDDLE_OFFSET)))
             .solids('>Z')
+
+            # Display cutout
             .faces('>Z')
             .workplane()
             .moveTo(0.2, -4.8)
@@ -253,8 +273,9 @@ if __name__ == '__main__':
             .edges('>>Y[1] or >>Y[2] or >>Y[4]')
             .chamfer(1.0)
 
+            # Cartridge slot cutout
             .moveTo(0.0, 6.0)
-            .rect(11.2, 6.8, centered=True)
+            .rect(11.6, 7.2, centered=True)
             .cutThruAll()
             .faces('>Z')
             .edges('|Y')
@@ -266,19 +287,24 @@ if __name__ == '__main__':
             .add(pcb_outline.translate((0, 0, MIDDLE_OFFSET)))
             .wires()
             .toPending()
-            .offset2D(-0.4)
+            .offset2D(-0.2)
             .cutBlind(1.6)
 
             .pushPoints(buttons_xy)
             .circle(BUTTON_D / 2 + TOL * 2)
             .cutThruAll()
 
-            .edges(cq.selectors.TypeSelector('CIRCLE'))
-            .edges('>>Z[1]')
-            .edges('>>Y[3] or >>Y[4]')
-            .chamfer(0.6)
+            .faces('<<Z[14]')
+            .workplane(invert=True)
+            .pushPoints(buttons_xy)
+            .circle(BUTTON_D / 2 + 0.7)
+            .cutBlind(BUTTONS_OFFSET)
 
-            .faces('<<Z[15]')
+            .edges(RadiusSelector(BUTTON_D / 2 + TOL, BUTTON_D / 2 + TOL * 3))
+            .edges('<Z')
+            .chamfer(0.49)
+
+            .faces('<<Z[17]')
             .workplane()
             .moveTo(0.2, 4.8)
             .rect(DISP_FILTER_SX + TOL, DISP_FILTER_SY + TOL, centered=True)
@@ -295,14 +321,13 @@ if __name__ == '__main__':
 
     show(
          # style(housing_whole, color='steelblue', alpha=0.8),
-         # style(housing_top, color='cyan', alpha=1.0, markersize=1),
-         # style(buttons, color='red', alpha=1.0, markersize=1),
+         style(housing_top, color='cyan', alpha=1.0, markersize=1),
+         style(buttons, color='red', alpha=1.0, markersize=1),
          style(housing_middle, color='steelblue', alpha=1.0, markersize=1),
          style(housing_bottom, color='cyan', alpha=1.0, markersize=1),
-         # style(display_filter, color='gray', alpha=1.0, markersize=1),
-         # style(load_power_supply_pcb(), color='green', alpha=1.0, markersize=1),
-         # style(load_base_board_pcb(), color='green', alpha=1.0, markersize=1),
-         # speaker_grill_cutout,
+         style(display_filter, color='gray', alpha=1.0, markersize=1),
+         style(load_power_supply_pcb(), color='green', alpha=1.0, markersize=1),
+         style(load_base_board_pcb(), color='green', alpha=1.0, markersize=1),
          )
 
     housing_bottom.val().exportStep(OUTPUT_DIR + '/housing_bottom.stp')
