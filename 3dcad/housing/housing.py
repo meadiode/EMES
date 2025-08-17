@@ -1,5 +1,9 @@
 import cadquery as cq
-from xvis import show, style
+try:
+    from xvis import show, style
+except ImportError:
+    from cadquery.vis import show, style
+
 from cadquery.occ_impl.shapes import edgesToWires
 from os.path import abspath, dirname
 
@@ -80,6 +84,23 @@ if __name__ == '__main__':
         return pcb
 
 
+    class RadiusSelector(cq.Selector):
+
+        def __init__(self, rmin, rmax):
+            self.rmin = rmin
+            self.rmax = rmax
+
+        def filter(self, objs):
+            res = []
+            for obj in objs:
+                try:
+                    if self.rmin <= obj.radius() <= self.rmax:
+                        res.append(obj)
+                except:
+                    pass
+            return res
+
+
     SCREW_SPACE = 4.0
     YDIM = bb.ylen + TH * 2 + SCREW_SPACE
 
@@ -89,6 +110,8 @@ if __name__ == '__main__':
             (-16.5, -14.5),
             (16.5, -14.5),
         )
+
+    key_chain_xy = (-15.0, 8.5)
 
     housing_whole = \
         (cq.Workplane('XY')
@@ -120,14 +143,15 @@ if __name__ == '__main__':
             .cutBlind(-2.0)
 
             # Chain hole
-            .moveTo(-14.5, 7.5)
-            .slot2D(9.0, 4.0, -55.0)
+            .moveTo(*key_chain_xy)
+            # .slot2D(9.0, 4.0, -55.0)
+            .circle(3.5)
             .cutThruAll()
-            .edges(cq.selectors.BoxSelector((-10.0, 4.0, -2.0),
-                                            (-18.0, 10.0, HOUSING_H + 2.0),
-                                            False))
-            .edges('>Z or <Z')
-            .chamfer(1.0)
+            # .edges(cq.selectors.BoxSelector((-15.0 - 3.6, 8.5 - 3.6, -2.0),
+            #                                 (-15.0 + 3.6, 8.5 + 3.6, HOUSING_H + 2.0),
+            #                                 False))
+            # .edges('>Z or <Z')
+            # .chamfer(0.7)
 
             # Vertical fillets
             .edges('|Z and <X and >Y')
@@ -141,7 +165,6 @@ if __name__ == '__main__':
             .chamfer(0.6)
         )
 
-
     housing_bottom = \
         (housing_whole
             .split(cq.Face.makePlane(basePnt=(0, 0, BOTTOM_H)))
@@ -152,7 +175,20 @@ if __name__ == '__main__':
             .wires()
             .toPending()
             .offset2D(PCB_TOL)
-            .cutBlind(-1.6))
+            .cutBlind(-1.6)
+
+            .moveTo(*key_chain_xy)
+            .circle(3.5 + TOL)
+            .cutThruAll()
+            .faces('<Z')
+            .workplane(invert=True)
+            .moveTo(*key_chain_xy)
+            .circle(4.0 + TOL)
+            .cutBlind(2.0)
+            .faces('>Z[2]')
+            .edges(RadiusSelector(rmin=4.1, rmax=4.1))
+            .chamfer(0.49)
+        )
 
     usb_port_cutout = \
         (cq.Workplane('XZ')
@@ -185,7 +221,6 @@ if __name__ == '__main__':
             .translate((-20.0, -1.5, 7.0))
         )
 
-
     housing_middle = \
         (housing_whole
             .split(cq.Face.makePlane(basePnt=(0, 0, BOTTOM_H)))
@@ -207,6 +242,10 @@ if __name__ == '__main__':
             .cutBlind(-1.6)
             .cut(usb_port_cutout)
             .cut(speaker_grill_cutout)
+
+            .moveTo(*key_chain_xy)
+            .circle(3.5 + TOL)
+            .cutThruAll()
         )
 
 
@@ -241,22 +280,6 @@ if __name__ == '__main__':
             .translate((0, 0, MIDDLE_OFFSET + 1.3)))
 
 
-    class RadiusSelector(cq.Selector):
-
-        def __init__(self, rmin, rmax):
-            self.rmin = rmin
-            self.rmax = rmax
-
-        def filter(self, objs):
-            res = []
-            for obj in objs:
-                try:
-                    if self.rmin <= obj.radius() <= self.rmax:
-                        res.append(obj)
-                except:
-                    pass
-            return res
-
     housing_top = \
         (housing_whole
             .split(cq.Face.makePlane(basePnt=(0, 0, MIDDLE_OFFSET)))
@@ -268,10 +291,6 @@ if __name__ == '__main__':
             .moveTo(0.2, -4.8)
             .rect(15.0, 10.0, centered=True)
             .cutThruAll()
-            .faces('>Z')
-            .edges('|X or |Y')
-            .edges('>>Y[1] or >>Y[2] or >>Y[4]')
-            .chamfer(1.0)
 
             # Cartridge slot cutout
             .moveTo(0.0, 6.0)
@@ -282,6 +301,7 @@ if __name__ == '__main__':
             .edges('>>X[2] or >>X[3]')
             .chamfer(2.0)
 
+            # PCB-shape hollow out
             .faces('>Z')
             .workplane()
             .add(pcb_outline.translate((0, 0, MIDDLE_OFFSET)))
@@ -290,25 +310,59 @@ if __name__ == '__main__':
             .offset2D(-0.2)
             .cutBlind(1.6)
 
+            # Button holes
             .pushPoints(buttons_xy)
             .circle(BUTTON_D / 2 + TOL * 2)
             .cutThruAll()
-
-            .faces('<<Z[14]')
+            .faces('<<Z[9]')
             .workplane(invert=True)
             .pushPoints(buttons_xy)
             .circle(BUTTON_D / 2 + 0.7)
             .cutBlind(BUTTONS_OFFSET)
-
+            # Button holes inner chamfers 
             .edges(RadiusSelector(BUTTON_D / 2 + TOL, BUTTON_D / 2 + TOL * 3))
             .edges('<Z')
             .chamfer(0.49)
 
-            .faces('<<Z[17]')
+            # Display filter recess
+            .faces('<<Z[13]')
             .workplane()
             .moveTo(0.2, 4.8)
             .rect(DISP_FILTER_SX + TOL, DISP_FILTER_SY + TOL, centered=True)
             .cutBlind(-DISP_FILTER_TH - DISP_FILTER_H_OFFSET)
+        )
+
+    snap_stud = \
+        (cq.Workplane('XY')
+            .circle(3.5)
+            .circle(3.0)
+            .extrude(HOUSING_H)
+            .faces('>Z')
+            .edges(RadiusSelector(rmin=3.0, rmax=3.0))
+            .chamfer(0.49)
+            
+            .faces('<Z')
+            .workplane()
+            .circle(3.5)
+            .circle(4.0)
+            .extrude(-2.0)
+            .edges(RadiusSelector(rmin=4.0, rmax=4.0))
+            .chamfer(0.49)
+            .faces('<Z')
+            .workplane()
+            .rect(4.0, 100.0)
+            .cutBlind(-(BOTTOM_H + MIDDLE_H / 2))
+            .edges('|Y')
+            .edges('>>Z')
+            .fillet(1.1)
+
+            .translate((*key_chain_xy, 0.0))
+        )
+
+    housing_top = \
+        (housing_top
+            .add(snap_stud)
+            .combine()
         )
 
     display_filter = \
@@ -319,13 +373,14 @@ if __name__ == '__main__':
                         MIDDLE_OFFSET + 1.6 + DISP_FILTER_H_OFFSET)))
 
 
+
     show(
          # style(housing_whole, color='steelblue', alpha=0.8),
-         style(housing_top, color='cyan', alpha=1.0, markersize=1),
+         style(housing_top, color='cyan', alpha=0.3, markersize=1),
          style(buttons, color='red', alpha=1.0, markersize=1),
-         style(housing_middle, color='steelblue', alpha=1.0, markersize=1),
-         style(housing_bottom, color='cyan', alpha=1.0, markersize=1),
-         style(display_filter, color='gray', alpha=1.0, markersize=1),
+         style(housing_middle, color='steelblue', alpha=0.3, markersize=1),
+         style(housing_bottom, color='cyan', alpha=0.3, markersize=1),
+         style(display_filter, color='gray', alpha=0.3, markersize=1),
          style(load_power_supply_pcb(), color='green', alpha=1.0, markersize=1),
          style(load_base_board_pcb(), color='green', alpha=1.0, markersize=1),
          )
