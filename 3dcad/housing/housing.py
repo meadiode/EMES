@@ -14,21 +14,22 @@ OUTPUT_DIR = f'{dirname(abspath(__file__))}'
 
 TOL = 0.1
 PCB_TOL = 0.3
+PCB_TH = 1.6
 TH = 1.8
 
 BOTTOM_H = 4.0
-MIDDLE_H = 8.0
-TOP_H = 4.0
+MIDDLE_H = 7.0
+TOP_H = 3.0
 HOUSING_H = BOTTOM_H + MIDDLE_H + TOP_H
 MIDDLE_OFFSET = BOTTOM_H + MIDDLE_H
 
 DISP_FILTER_SX = 19.0
 DISP_FILTER_SY = 12.0
-DISP_FILTER_TH = 1.1
+DISP_FILTER_TH = 0.2
 DISP_FILTER_H_OFFSET = 1.0
 
 BUTTON_D = 5.0
-BUTTONS_OFFSET = 1.5
+BUTTONS_OFFSET = 0.5
 
 if __name__ == '__main__':
 
@@ -102,6 +103,7 @@ if __name__ == '__main__':
 
 
     SCREW_SPACE = 4.0
+    XDIM = bb.xlen + TH * 2
     YDIM = bb.ylen + TH * 2 + SCREW_SPACE
 
     screws_xy = \
@@ -113,12 +115,29 @@ if __name__ == '__main__':
 
     key_chain_xy = (-15.0, 8.5)
 
+    FCUT_DEPTH = SCREW_SPACE + 0.5
+
+    front_cutout = \
+        (cq.Workplane('XY')
+            .moveTo(0.0, FCUT_DEPTH + (-(YDIM - SCREW_SPACE) / 2 - SCREW_SPACE))
+            .hLine(XDIM / 2 - SCREW_SPACE - 6.0)
+            .line(SCREW_SPACE, -FCUT_DEPTH)
+            .hLineTo(XDIM / 2 + 1)
+            .vLine(-1.0)
+            .hLineTo(0.0)
+            .close()
+            .extrude(HOUSING_H)
+            .edges('|Z')
+            .edges('>>X[1] or >>X[2]')
+            .fillet(5.0)
+            .mirror('YZ', union=True)
+        )
+
+
     housing_whole = \
         (cq.Workplane('XY')
             .moveTo(0.0, -(YDIM - SCREW_SPACE) / 2 - SCREW_SPACE)
-            .rect(bb.xlen + TH * 2,
-                  YDIM,
-                  centered=(True, False))
+            .rect(XDIM, YDIM, centered=(True, False))
             .extrude(HOUSING_H)
 
             # Screw holes
@@ -153,6 +172,9 @@ if __name__ == '__main__':
             # .edges('>Z or <Z')
             # .chamfer(0.7)
 
+
+            .cut(front_cutout)
+
             # Vertical fillets
             .edges('|Z and <X and >Y')
             .fillet(4.0)
@@ -175,7 +197,7 @@ if __name__ == '__main__':
             .wires()
             .toPending()
             .offset2D(PCB_TOL)
-            .cutBlind(-1.6)
+            .cutBlind(-PCB_TH)
 
             .moveTo(*key_chain_xy)
             .circle(3.5 + TOL)
@@ -214,11 +236,32 @@ if __name__ == '__main__':
             .rotate((0, 0, 0), (1, 0, 0), 45.0)
             .intersect((cq.Workplane('YZ')
                         # .circle(5.0 / 2)
-                        .rect(5.0, 5.0)
+                        .rect(5.0, 4.0)
                         .extrude(10.0, both=True)
                         .edges('|X')
                         .fillet(0.5)))
             .translate((-20.0, -1.5, 7.0))
+        )
+
+
+    STRAP_TH = 2.5
+
+    strap_cutout = \
+        (cq.Workplane('XY')
+            .vLine(10.0)
+            .hLine(-STRAP_TH)
+            .vLine(-10.0 - STRAP_TH)
+            .hLine(10.0)
+            .vLine(STRAP_TH)
+            .close()
+            .extrude(10.0)
+            .edges('|Z and <X and <Y')
+            .fillet(5.0)
+            .edges('|Z')
+            .edges('>>Y[1]')
+            .edges('<X')
+            .fillet(2.5)
+            .translate((13.7, 6.3, BOTTOM_H + 1.0))
         )
 
     housing_middle = \
@@ -239,13 +282,15 @@ if __name__ == '__main__':
             .wires()
             .toPending()
             .offset2D(PCB_TOL)
-            .cutBlind(-1.6)
+            .cutBlind(-PCB_TH)
             .cut(usb_port_cutout)
             .cut(speaker_grill_cutout)
 
             .moveTo(*key_chain_xy)
             .circle(3.5 + TOL)
             .cutThruAll()
+
+            .cut(strap_cutout)
         )
 
 
@@ -257,13 +302,14 @@ if __name__ == '__main__':
             ( 13.68, -8.065),
         )
 
+    disp_center_xy = (0.2, -4.8)
 
     button = \
         (cq.Workplane('XZ')
             .hLine(BUTTON_D / 2 + 0.6)
             .lineTo(BUTTON_D / 2, 0.6)
-            .vLineTo(4.0)
-            .radiusArc((0.0, 4.5), -4.0)
+            .vLineTo(2.5)
+            .radiusArc((0.0, 3.0), -4.0)
             .close()
             .revolve()
             .edges('>>Z[4]')
@@ -277,7 +323,7 @@ if __name__ == '__main__':
         (cq.Workplane('XY')
             .pushPoints(buttons_xy)
             .eachpoint(button)
-            .translate((0, 0, MIDDLE_OFFSET + 1.3)))
+            .translate((0, 0, MIDDLE_OFFSET + 1.8)))
 
 
     housing_top = \
@@ -288,7 +334,7 @@ if __name__ == '__main__':
             # Display cutout
             .faces('>Z')
             .workplane()
-            .moveTo(0.2, -4.8)
+            .moveTo(*disp_center_xy)
             .rect(15.0, 10.0, centered=True)
             .cutThruAll()
 
@@ -296,26 +342,26 @@ if __name__ == '__main__':
             .moveTo(0.0, 6.0)
             .rect(11.6, 7.2, centered=True)
             .cutThruAll()
-            .faces('>Z')
-            .edges('|Y')
-            .edges('>>X[2] or >>X[3]')
-            .chamfer(2.0)
+            # .faces('>Z')
+            # .edges('|Y')
+            # .edges('>>X[2] or >>X[3]')
+            # .chamfer(2.0)
 
             # PCB-shape hollow out
             .faces('>Z')
-            .workplane()
+            .workplane().tag('z_top')
             .add(pcb_outline.translate((0, 0, MIDDLE_OFFSET)))
             .wires()
             .toPending()
             .offset2D(-0.2)
-            .cutBlind(1.6)
+            .cutBlind(PCB_TH)
 
             # Button holes
             .pushPoints(buttons_xy)
             .circle(BUTTON_D / 2 + TOL * 2)
             .cutThruAll()
-            .faces('<<Z[9]')
-            .workplane(invert=True)
+            .workplaneFromTagged('z_top')
+            .workplane(offset=PCB_TH).tag('z_btn')
             .pushPoints(buttons_xy)
             .circle(BUTTON_D / 2 + 0.7)
             .cutBlind(BUTTONS_OFFSET)
@@ -325,11 +371,10 @@ if __name__ == '__main__':
             .chamfer(0.49)
 
             # Display filter recess
-            .faces('<<Z[13]')
-            .workplane()
-            .moveTo(0.2, 4.8)
+            .workplaneFromTagged('z_btn')
+            .moveTo(*disp_center_xy)
             .rect(DISP_FILTER_SX + TOL, DISP_FILTER_SY + TOL, centered=True)
-            .cutBlind(-DISP_FILTER_TH - DISP_FILTER_H_OFFSET)
+            .cutBlind(DISP_FILTER_TH + DISP_FILTER_H_OFFSET)
         )
 
     snap_stud = \
@@ -376,6 +421,7 @@ if __name__ == '__main__':
 
     show(
          # style(housing_whole, color='steelblue', alpha=0.8),
+         # style(front_cutout, color='red', alpha=0.8),
          style(housing_top, color='cyan', alpha=0.3, markersize=1),
          style(buttons, color='red', alpha=1.0, markersize=1),
          style(housing_middle, color='steelblue', alpha=0.3, markersize=1),
