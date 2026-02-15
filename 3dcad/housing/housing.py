@@ -109,6 +109,7 @@ if __name__ == '__main__':
     screws_xy = \
         (
             (16.5, 10.0),
+            (-16.5, 10.0),
             (-16.5, -14.5),
             (16.5, -14.5),
         )
@@ -161,18 +162,6 @@ if __name__ == '__main__':
             .circle(3.8 / 2)
             .cutBlind(-2.0)
 
-            # Chain hole
-            .moveTo(*key_chain_xy)
-            # .slot2D(9.0, 4.0, -55.0)
-            .circle(3.5)
-            .cutThruAll()
-            # .edges(cq.selectors.BoxSelector((-15.0 - 3.6, 8.5 - 3.6, -2.0),
-            #                                 (-15.0 + 3.6, 8.5 + 3.6, HOUSING_H + 2.0),
-            #                                 False))
-            # .edges('>Z or <Z')
-            # .chamfer(0.7)
-
-
             .cut(front_cutout)
 
             # Vertical fillets
@@ -198,18 +187,6 @@ if __name__ == '__main__':
             .toPending()
             .offset2D(PCB_TOL)
             .cutBlind(-PCB_TH)
-
-            .moveTo(*key_chain_xy)
-            .circle(3.5 + TOL)
-            .cutThruAll()
-            .faces('<Z')
-            .workplane(invert=True)
-            .moveTo(*key_chain_xy)
-            .circle(4.0 + TOL)
-            .cutBlind(2.0)
-            .faces('>Z[2]')
-            .edges(RadiusSelector(rmin=4.1, rmax=4.1))
-            .chamfer(0.49)
         )
 
     usb_port_cutout = \
@@ -244,14 +221,14 @@ if __name__ == '__main__':
         )
 
 
-    STRAP_TH = 2.5
+    STRAP_TH = 3.0
 
     strap_cutout = \
         (cq.Workplane('XY')
             .vLine(10.0)
             .hLine(-STRAP_TH)
             .vLine(-10.0 - STRAP_TH)
-            .hLine(10.0)
+            .hLine(15.0)
             .vLine(STRAP_TH)
             .close()
             .extrude(10.0)
@@ -261,7 +238,9 @@ if __name__ == '__main__':
             .edges('>>Y[1]')
             .edges('<X')
             .fillet(2.5)
-            .translate((13.7, 6.3, BOTTOM_H + 1.0))
+            .edges('<Z')
+            .fillet(STRAP_TH / 2 - 0.01)
+            .translate((14.3, 6.8, BOTTOM_H + 1.0))
         )
 
     housing_middle = \
@@ -286,11 +265,8 @@ if __name__ == '__main__':
             .cut(usb_port_cutout)
             .cut(speaker_grill_cutout)
 
-            .moveTo(*key_chain_xy)
-            .circle(3.5 + TOL)
-            .cutThruAll()
-
             .cut(strap_cutout)
+            .cut(strap_cutout.mirror('YZ'))
         )
 
 
@@ -326,26 +302,15 @@ if __name__ == '__main__':
             .translate((0, 0, MIDDLE_OFFSET + 1.8)))
 
 
-    housing_top = \
+    housing_top_blind = \
         (housing_whole
             .split(cq.Face.makePlane(basePnt=(0, 0, MIDDLE_OFFSET)))
             .solids('>Z')
-
-            # Display cutout
-            .faces('>Z')
-            .workplane()
-            .moveTo(*disp_center_xy)
-            .rect(15.0, 10.0, centered=True)
-            .cutThruAll()
 
             # Cartridge slot cutout
             .moveTo(0.0, 6.0)
             .rect(11.6, 7.2, centered=True)
             .cutThruAll()
-            # .faces('>Z')
-            # .edges('|Y')
-            # .edges('>>X[2] or >>X[3]')
-            # .chamfer(2.0)
 
             # PCB-shape hollow out
             .faces('>Z')
@@ -374,41 +339,20 @@ if __name__ == '__main__':
             .workplaneFromTagged('z_btn')
             .moveTo(*disp_center_xy)
             .rect(DISP_FILTER_SX + TOL, DISP_FILTER_SY + TOL, centered=True)
-            .cutBlind(DISP_FILTER_TH + DISP_FILTER_H_OFFSET)
-        )
-
-    snap_stud = \
-        (cq.Workplane('XY')
-            .circle(3.5)
-            .circle(3.0)
-            .extrude(HOUSING_H)
-            .faces('>Z')
-            .edges(RadiusSelector(rmin=3.0, rmax=3.0))
-            .chamfer(0.49)
-            
-            .faces('<Z')
-            .workplane()
-            .circle(3.5)
-            .circle(4.0)
-            .extrude(-2.0)
-            .edges(RadiusSelector(rmin=4.0, rmax=4.0))
-            .chamfer(0.49)
-            .faces('<Z')
-            .workplane()
-            .rect(4.0, 100.0)
-            .cutBlind(-(BOTTOM_H + MIDDLE_H / 2))
-            .edges('|Y')
-            .edges('>>Z')
-            .fillet(1.1)
-
-            .translate((*key_chain_xy, 0.0))
+            # .cutBlind(DISP_FILTER_TH + DISP_FILTER_H_OFFSET)
+            .cutBlind(DISP_FILTER_H_OFFSET)
         )
 
     housing_top = \
-        (housing_top
-            .add(snap_stud)
-            .combine()
+        (housing_top_blind
+            # Display cutout
+            .faces('>Z')
+            .workplane()
+            .moveTo(*disp_center_xy)
+            .rect(15.0, 10.0, centered=True)
+            .cutThruAll()
         )
+
 
     display_filter = \
         (cq.Workplane('XY')
@@ -422,11 +366,12 @@ if __name__ == '__main__':
     show(
          # style(housing_whole, color='steelblue', alpha=0.8),
          # style(front_cutout, color='red', alpha=0.8),
-         style(housing_top, color='cyan', alpha=0.3, markersize=1),
+         # style(housing_top, color='cyan', alpha=0.3, markersize=1),
+         style(housing_top_blind, color='cyan', alpha=0.3, markersize=1),
          style(buttons, color='red', alpha=1.0, markersize=1),
          style(housing_middle, color='steelblue', alpha=0.3, markersize=1),
          style(housing_bottom, color='cyan', alpha=0.3, markersize=1),
-         style(display_filter, color='gray', alpha=0.3, markersize=1),
+         # style(display_filter, color='gray', alpha=0.3, markersize=1),
          style(load_power_supply_pcb(), color='green', alpha=1.0, markersize=1),
          style(load_base_board_pcb(), color='green', alpha=1.0, markersize=1),
          )
@@ -434,4 +379,5 @@ if __name__ == '__main__':
     housing_bottom.val().exportStep(OUTPUT_DIR + '/housing_bottom.stp')
     housing_middle.val().exportStep(OUTPUT_DIR + '/housing_middle.stp')
     housing_top.val().exportStep(OUTPUT_DIR + '/housing_top.stp')
+    housing_top_blind.val().exportStep(OUTPUT_DIR + '/housing_top_blind.stp')
     button.val().exportStep(OUTPUT_DIR + '/button.stp')
