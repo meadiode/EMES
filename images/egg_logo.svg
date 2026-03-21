@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="8mm"
+   height="8mm"
+   viewBox="0 0 8 8"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.2 (ebf0e94, 2025-05-08)"
+   inkscape:export-filename="egg_logo.svg"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showgrid="true">
+    <inkscape:grid
+       id="grid1"
+       units="mm"
+       originx="0"
+       originy="0"
+       spacingx="0.49999999"
+       spacingy="0.49999999"
+       empcolor="#0099e5"
+       empopacity="0.30196078"
+       color="#0099e5"
+       opacity="0.14901961"
+       empspacing="4"
+       enabled="true"
+       visible="true" />
+    <inkscape:page
+       x="0"
+       y="0"
+       width="8"
+       height="8"
+       id="page2"
+       margin="0"
+       bleed="0" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       id="path1"
+       style="fill:#000000;stroke-width:0.632532;stroke-linecap:round;stroke-linejoin:round"
+       d="M 0.80635744,1.7141234 C 0.78724883,1.7497698 0.76978633,1.7863928 0.75427535,1.8241726 0.32094967,2.8270839 0.36077482,4.5796309 2.343521,6.4051975 L 2.0650249,5.0688253 3.5685433,4.6411893 3.5842281,2.2025263 5.5151805,1.4795646 C 3.684446,0.52812188 1.3987145,0.60900672 0.80635744,1.7141234 Z M 2.6488371,5.551067 2.8425506,6.6509333 c 1.816e-4,1.15e-4 3.317e-4,2.676e-4 5.136e-4,3.827e-4 C 4.4524362,7.6717593 6.259132,6.8531626 7.0308801,5.8468664 8.2132795,4.2564742 7.3775386,2.4422544 6.3181697,1.5228468 L 4.8772138,2.3463797 4.4021727,4.8263496 Z" />
+  </g>
+</svg>
