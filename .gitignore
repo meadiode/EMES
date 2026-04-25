@@ -14,3 +14,6 @@ kicad/*/*_gerbers.zip
 kicad/*/placement
 *.kicad*-bak
 *.sublime-*
+__pycache__
+run_cq.sh
+xvis.py

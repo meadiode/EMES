@@ -7,12 +7,17 @@
 #define DIR_LEFT   2
 #define DIR_DOWN   3
 
+#define KEY_LU     1
+#define KEY_LB     0
+#define KEY_RU     3
+#define KEY_RB     2
+
 #define SNEK_MOVE_TIME   128
 #define SNEK_BUFFER_SIZE 13
 
-#define SNEK_HEAD_VALUE  0x0f
-#define SNEK_BODY_VALUE1 0x04
-#define SNEK_BODY_VALUE2 0x01
+#define SNEK_HEAD_VALUE  40
+#define SNEK_BODY_VALUE1 20
+#define SNEK_BODY_VALUE2 2
 
 #define SPEAKER_PWM_DUTY 500
 #define SPEAKER_PWM(Hz)  (8000000 / (Hz))  ; Min Hz value: 122
@@ -400,20 +405,20 @@ poll_kb_key_none:
     ldi r17, 0                       ; No key is pressed 
     rjmp poll_kb_update_r26
 
-poll_kb_key_1:                       ; UP key
-    ldi r17, (DIR_UP + 1)
+poll_kb_key_1:
+    ldi r17, (KEY_LU + 1)
     rjmp poll_kb_update_r26
 
-poll_kb_key_2:                       ; DOWN key
-    ldi r17, (DIR_DOWN + 1)
+poll_kb_key_2:
+    ldi r17, (KEY_RU + 1)
     rjmp poll_kb_update_r26
 
-poll_kb_key_3:                       ; LEFT key
-    ldi r17, (DIR_LEFT + 1)               
+poll_kb_key_3:
+    ldi r17, (KEY_RB + 1)               
     rjmp poll_kb_update_r26
 
-poll_kb_key_4:                       ; RIGHT key
-    ldi r17, (DIR_RIGHT + 1)
+poll_kb_key_4:
+    ldi r17, (KEY_LB + 1)
     rjmp poll_kb_update_r26
 
 poll_kb_update_r26:
@@ -632,7 +637,7 @@ shift_snek_buffer_nb:
 ; Outputs:
 ;  r23 - updated cursor x
 ;  r24 - updated cursor y
-; Used registers: r23, r24
+; Used registers: r23, r24, r25
 ; Call depth: 1
 move_snek_cursor:
     cpi r25, DIR_UP
@@ -670,7 +675,7 @@ move_snek_cursor_done:
 
 .global process_input
 ; Update snake heading direction according to pressed keys
-; Used registers: r17, r24, r26
+; Used registers: r17, r24
 ; Call depth: 1
 process_input:
     sbrs KB_REG, 7             ; Exit if no key-down event present (LSB isn't set)    
@@ -679,14 +684,25 @@ process_input:
     andi r17, 0b111
     cpi r17, 0                 ; Exit if no key is pressed
     breq process_input_done
-    dec r17                    ; Convert key id to direction id
-
+    
+    dec r17                    ; r17 - key id
+    
     lds r24, prev_hdir
-    add r24, r17               
-    sbrs r24, 0
-    rjmp process_input_done    ; Exit if the new direction is oposite to the current one
+    andi r24, 0x01
+    breq process_input_left_right
 
-    sts hdir, r17              ; Update direction
+    ldi r24, DIR_LEFT
+    sbrc r17, 1
+    ldi r24, DIR_RIGHT
+    rjmp process_input_update_hdir
+
+process_input_left_right:
+    ldi r24, DIR_DOWN
+    sbrc r17, 0
+    ldi r24, DIR_UP
+
+process_input_update_hdir:
+    sts hdir, r24              ; Update direction
 process_input_done:
     ret
 

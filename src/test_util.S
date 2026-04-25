@@ -9,11 +9,32 @@
 #define DIR_LEFT   0x01
 #define DIR_RIGHT  0x02
 
+#define SPEAKER_PWM_DUTY 500
+#define SPEAKER_PWM(Hz)  (8000000 / (Hz))  ; Min Hz value: 122
+
+#define C4 260
+#define D4 290
+#define E4 330
+#define F4 355
+#define G4 390
+#define A4 440
+#define B4 495
+
+#define C5 (C4 * 2)
+#define D5 (D4 * 2)
+#define E5 (E4 * 2)
+#define F5 (F4 * 2)
+#define G5 (G4 * 2)
+#define A5 (A4 * 2)
+#define B5 (B4 * 2)
+
 #define ADDR_W 0x40
 #define ADDR_R 0x41
 
 #define SCL PORTB2
 #define SDA PORTB3
+
+#define PIXEL_VALUE 28
 
 .section .data
 .section .text
@@ -73,14 +94,15 @@ write_pwm_val:
     brne write_pwm_val
 
 
+startup:
+    ldi r30, lo8(img_emes + 0x4000)
+    ldi r31, hi8(img_emes + 0x4000)
+    rcall display_draw_img_15x10
 
-test_display_read:
-    
-;    ldi r21, 0xfc
-;    rcall display_read_reg
-;    ldi r17, 8
-;    rcall looong_delay
-    ;rjmp test_display_read
+    ldi r30, lo8(tune_startup + 0x4000)
+    ldi r31, hi8(tune_startup + 0x4000)
+    rcall play_tune
+
 
 main_loop:
     rcall poll_kb
@@ -99,32 +121,32 @@ main_loop:
 key_1:
     ldi r30, lo8(img_club + 0x4000)
     ldi r31, hi8(img_club + 0x4000)
-    ldi r19, hi8(8000000 / 250)
-    ldi r18, lo8(8000000 / 250)
+    ldi r19, hi8(8000000 / C4)
+    ldi r18, lo8(8000000 / C4)
     rcall beep
     rjmp draw_img
 
 key_2:
     ldi r30, lo8(img_heart + 0x4000)
     ldi r31, hi8(img_heart + 0x4000)
-    ldi r19, hi8(8000000 / 350)
-    ldi r18, lo8(8000000 / 350)
+    ldi r19, hi8(8000000 / F4)
+    ldi r18, lo8(8000000 / F4)
     rcall beep
     rjmp draw_img
 
 key_3:
     ldi r30, lo8(img_spade + 0x4000)
     ldi r31, hi8(img_spade + 0x4000)
-    ldi r19, hi8(8000000 / 600)
-    ldi r18, lo8(8000000 / 600)
+    ldi r19, hi8(8000000 / D5)
+    ldi r18, lo8(8000000 / D5)
     rcall beep
     rjmp draw_img
 
 key_4:
     ldi r30, lo8(img_diamond + 0x4000)
     ldi r31, hi8(img_diamond + 0x4000)
-    ldi r19, hi8(8000000 / 1000)
-    ldi r18, lo8(8000000 / 1000)
+    ldi r19, hi8(8000000 / B5)
+    ldi r18, lo8(8000000 / B5)
     rcall beep
     rjmp draw_img
 
@@ -332,7 +354,7 @@ display_draw_img_15x10_put_pixel:
     sbrs r26, 7
     ldi r22, 0
     sbrc r26, 7
-    ldi r22, 0x20
+    ldi r22, PIXEL_VALUE
     inc r25
     lsl r26
     rcall display_set_pixel
@@ -422,6 +444,35 @@ poll_kb_update_r26:
 poll_kb_key_change:
     mov KB_REG, r17
     ori KB_REG, 0x80         ; Set MSB to indicate that it's a diffferent key now
+    ret
+
+
+.global play_tune
+; Call depth: 2
+play_tune:
+    ldi r17, ((1 << COM0B1) | (1 << WGM01))   ; Enable PWM output
+    out TCCR0A, r17
+
+    ldi r18, hi8(SPEAKER_PWM_DUTY) 
+    ldi r19, lo8(SPEAKER_PWM_DUTY)
+    out OCR0BH, r18
+    out OCR0BL, r19
+
+    ld r16, Z+            ; Number of notes
+play_tune_loop:
+    ld r17, Z+            ; Duration (in multiple of 25ms)
+    ld r18, Z+            ; Frequncy hi byte
+    ld r19, Z+            ; Frequncy low byte
+    out ICR0H, r19
+    out ICR0L, r18
+    rcall looong_delay
+
+    dec r16
+    brne play_tune_loop
+
+    ldi r17, 1 << COM0B1  ; Disable PWM output
+    out TCCR0A, r17
+
     ret
 
 
@@ -588,6 +639,33 @@ img_emes:
     .byte 0b00111010
     .byte 0b11000000
 
+
+tune_startup:
+    .byte 8                   ; Number of notes
+    
+    .byte 5                   ; Duration
+    .short SPEAKER_PWM(A4)    ; Frequency
+
+    .byte 5                   ; Duration
+    .short SPEAKER_PWM(C5)    ; Frequency
+
+    .byte 5                   ; Duration
+    .short SPEAKER_PWM(A4)    ; Frequency
+
+    .byte 5                   ; Duration
+    .short SPEAKER_PWM(E5)    ; Frequency
+
+    .byte 5                   ; Duration
+    .short SPEAKER_PWM(B4)    ; Frequency
+
+    .byte 5                   ; Duration
+    .short SPEAKER_PWM(G5)    ; Frequency
+
+    .byte 5                   ; Duration
+    .short SPEAKER_PWM(E5)    ; Frequency
+
+    .byte 5                   ; Duration
+    .short SPEAKER_PWM(D5)    ; Frequency
 
 .section .data;
 

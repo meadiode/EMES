@@ -29,7 +29,7 @@ CFLAGS += -mmcu=$(DEVICE)
 COMPILE = $(GCC) $(CFLAGS)
 
 
-all: demo
+all: test_util
 
 $(BUILD_DIR):
 	$(MKDIR) -p $@
@@ -38,15 +38,6 @@ disable_reset_fuse:
 	$(DRIVER) -c $(PROGRAMMER) -p $(DEVICE) -U fuse:w:0xFE:m
 .PHONY: disable_reset_fuse
 
-demo: $(BUILD_DIR)
-	$(COMPILE) -c demo.S -o $(BUILD_DIR)/demo.o
-	$(COMPILE) -nostdlib -o $(BUILD_DIR)/demo.elf $(BUILD_DIR)/demo.o
-	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/demo.elf $(BUILD_DIR)/demo.hex
-	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/demo.elf
-
-demo_upload: demo
-	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/demo.hex:i
-.PHONY: demo_upload
 
 test_util: $(BUILD_DIR)
 	$(COMPILE) -c test_util.S -o $(BUILD_DIR)/test_util.o

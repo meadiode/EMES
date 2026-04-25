@@ -15,6 +15,27 @@
 #define SCL PORTB2
 #define SDA PORTB3
 
+#define START_SPEED          42
+#define DROP_SPEED           2
+#define LEVELUP_N            10
+#define LEVELUP_SPEED_CHANGE 3
+
+#define C4 260
+#define D4 290
+#define E4 330
+#define F4 355
+#define G4 390
+#define A4 440
+#define B4 495
+
+#define C5 (C4 * 2)
+#define D5 (D4 * 2)
+#define E5 (E4 * 2)
+#define F5 (F4 * 2)
+#define G5 (G4 * 2)
+#define A5 (A4 * 2)
+#define B5 (B4 * 2)
+
 .section .data
 .section .text
 
@@ -87,9 +108,33 @@ main_loop_move_shape:
     lds r16, shape_tx_flags
     andi r16, 0b10
     breq main_loop_cont
+; Shape landing 
     rcall beep
     rcall collapse_full_rows
     rcall spawn_shape
+
+; Check if game over
+    rcall load_shape
+    lds r27, shape_x
+    lds r18, shape_y
+    ldi r30, lo8(gs(pixel_check))
+    ldi r31, hi8(gs(pixel_check))
+    rcall process_shape
+    brts main_loop_game_over
+
+; Increase speed after LEVELUP_N landed shapes
+    lds r16, shape_ctr
+    inc r16
+    cpi r16, LEVELUP_N
+    brlo main_loop_land_cont
+    ldi r16, 1
+    lds r17, fall_speed_val
+    subi r17, LEVELUP_SPEED_CHANGE
+    sts fall_speed_val, r17
+    sts fall_speed, r17
+
+main_loop_land_cont:
+    sts shape_ctr, r16
 
 main_loop_cont:
 
@@ -107,6 +152,14 @@ main_loop_no_fall:
     rcall looong_delay
 
     rjmp main_loop
+
+main_loop_game_over:
+    ldi r30, lo8(tune_game_over + 0x4000)
+    ldi r31, hi8(tune_game_over + 0x4000)
+    rcall play_tune
+
+main_loop_game_over_idle:
+    rjmp main_loop_game_over_idle
 
 
 .global long_delay
@@ -359,7 +412,7 @@ poll_kb_adc_wait_loop:
 ; Load key-id into r17
 poll_kb_key_none:
     ldi r17, KEY_NONE
-    ldi r16, 40
+    lds r16, fall_speed_val
     sts fall_speed, r16
     rjmp poll_kb_update
 
@@ -368,7 +421,7 @@ poll_kb_key_1:
     rjmp poll_kb_update
 
 poll_kb_key_2:
-    ldi r17, KEY_RIGHT
+    ldi r17, KEY_DOWN
     rjmp poll_kb_update
 
 poll_kb_key_3:
@@ -376,7 +429,7 @@ poll_kb_key_3:
     rjmp poll_kb_update
 
 poll_kb_key_4:
-    ldi r17, KEY_DOWN               
+    ldi r17, KEY_RIGHT               
     rjmp poll_kb_update
 
 
@@ -432,7 +485,7 @@ beep:
 
 
 .global process_shape
-; Inputes:
+; Inputs:
 ;   r27 - x position
 ;   r18 - y position
 ;   Y(r29, r28) - shape bitmap address
@@ -440,9 +493,8 @@ beep:
 ; Output:
 ;   T(flag) - T is set if the shape collides/goes off-screen
 ; Used registers: r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31
-; Call depth: 
+; Call depth: 5
 
-; r17, r19, r20, r21, r22, r23, r24
 process_shape:
     mov r24, r18 ; r24 - y
     ldi r25, 8 ; r25 - bit counter
@@ -475,24 +527,32 @@ process_shape_do_stuff:
     ret
 
 
-.global shape_check
-shape_check:
+.global pixel_check
+; Checks if a pixel is off-screen or if it's overlapping with a lit pixel on the screen 
+; Inputs:
+;   r23 - pixel x
+;   r24 - pixel y
+; Output:
+;   T(flag) - T is set if the pixel is off-screen or is overlapping
+; Used registers: r16, r17, r19, r20, r21, r22, r23, r24, 25, 26
+; Call depth: 4
+pixel_check:
     cpi r23, 0
-    brmi shape_check_fail
-    cpi r23, 15
-    brge shape_check_fail
+    brmi pixel_check_fail
+    cpi r23, 17
+    brge pixel_check_fail
     cpi r24, 0
-    brmi shape_check_fail
+    brmi pixel_check_fail
     cpi r24, 10
-    brge shape_check_fail
+    brge pixel_check_fail
     rcall display_get_pixel
     cpi r22, 0
-    brne shape_check_fail
-    rjmp shape_check_ret
+    brne pixel_check_fail
+    rjmp pixel_check_ret
 
-shape_check_fail:
+pixel_check_fail:
     set
-shape_check_ret:
+pixel_check_ret:
     ret
 
 
@@ -532,8 +592,8 @@ load_shape:
 check_and_restore_shape:
 ; Check if the shape is colliding
     rcall load_shape
-    ldi r30, lo8(gs(shape_check))
-    ldi r31, hi8(gs(shape_check))
+    ldi r30, lo8(gs(pixel_check))
+    ldi r31, hi8(gs(pixel_check))
     rcall process_shape
     ldi r22, 0x15
     brts check_and_restore_shape_restore
@@ -665,7 +725,7 @@ move_shape_key_rotate:
     rjmp move_shape_cont
 
 move_shape_key_down:
-    ldi r16, 5
+    ldi r16, DROP_SPEED
     sts fall_speed, r16
     rjmp move_shape_cont
 
@@ -713,6 +773,8 @@ rand:
     andi r18, 0b11100000
     eor r17, r18
 
+    inc r17
+
     sts seed, r17
     ret
 
@@ -720,9 +782,11 @@ rand:
 .global new_game
 ; Call depth: 1
 new_game:
-    ldi r16, 40
+    ldi r16, START_SPEED
+    sts fall_speed_val, r16
     sts fall_speed, r16
     ldi r16, 1
+    sts shape_ctr, r16
     sts fall_t, r16
 
     rcall spawn_shape
@@ -849,8 +913,56 @@ tune_row_collapse:
     .byte 5                   ; Duration
     .short SPEAKER_PWM(1500)  ; Frequency
 
-.section .data
 
+tune_game_over:
+    .byte 20                  ; Number of notes
+    
+    .byte 12
+    .short SPEAKER_PWM(E5)
+    .byte 6
+    .short SPEAKER_PWM(B4)
+    .byte 6
+    .short SPEAKER_PWM(C5)
+    .byte 12
+    .short SPEAKER_PWM(D5)
+    .byte 6
+    .short SPEAKER_PWM(C5)
+    .byte 6
+    .short SPEAKER_PWM(B4)
+
+    .byte 12
+    .short SPEAKER_PWM(A4)
+    .byte 6
+    .short SPEAKER_PWM(A4)
+    .byte 6
+    .short SPEAKER_PWM(C5)
+    .byte 12
+    .short SPEAKER_PWM(E5)
+    .byte 6
+    .short SPEAKER_PWM(D5)
+    .byte 6
+    .short SPEAKER_PWM(C5)
+
+    .byte 16
+    .short SPEAKER_PWM(B4)
+    .byte 6
+    .short SPEAKER_PWM(C5)
+    .byte 12
+    .short SPEAKER_PWM(D5)
+    .byte 12
+    .short SPEAKER_PWM(E5)
+
+    .byte 12
+    .short SPEAKER_PWM(C5)
+    .byte 12
+    .short SPEAKER_PWM(A4)
+    .byte 2
+    .short 0x0000
+    .byte 12
+    .short SPEAKER_PWM(A4)
+
+
+.section .data
 
 shape_x:
     .byte 0x00
@@ -877,4 +989,10 @@ fall_speed:
     .byte 0x00
 
 seed:
+    .byte 0x00
+
+shape_ctr:
+    .byte 0x00
+
+fall_speed_val:
     .byte 0x00

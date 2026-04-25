@@ -1,9 +1,11 @@
 #include <avr/io.h>
 
-#define DIR_UP     0x00
-#define DIR_DOWN   0x03
-#define DIR_LEFT   0x01
-#define DIR_RIGHT  0x02
+#define KB_REG            r26
+
+#define KEY_LU     1
+#define KEY_LB     0
+#define KEY_RU     3
+#define KEY_RB     2
 
 #define ADDR_W 0x40
 #define ADDR_R 0x41
@@ -227,75 +229,56 @@ display_clear_write_pwm_val:
 .global poll_kb
 ; Read keyboard
 ; Checks if a key is pressed by sampling analog signal from the keyboard resistor ladder
-; Output: r26 - key id [1..4], or zero if no key is pressed, MSB indicates a key-down event
-; Used registers: r17, r20, r21, r22, r26
+; Output: r26 - key id [1..4], or zero if no key is pressed
+; Used registers: r17, r20, r26
 poll_kb:
-    clr r20 
-    clr r21 
-    ldi r17, 4
-
-poll_kb_adc_sample_loop:             ; Sample ADC 4 times and store average in r20
-    sbi ADCSRA, ADSC
+    sbi ADCSRA, ADSC       ; Sample ADC
 
 poll_kb_adc_wait_loop:
     sbic ADCSRA, ADSC
     rjmp poll_kb_adc_wait_loop
-    in r22, ADCL
-    adc r20, r22
-    brcc poll_kb_no_hibyte_inc
-    inc r21
-poll_kb_no_hibyte_inc:
-    dec r17
-    brne poll_kb_adc_sample_loop
-
-    lsr r21                  ; Divide R21-R20 by 4 to find average
-    ror r20
-    lsr r21
-    ror r20
-
-    cpi r20, 40                ; Check if the resulting value corresponds to one of the keys
-    brlo poll_kb_key_none
-    cpi r20, 51
+    
+    in r20, ADCL
+    cpi r20, 25            ; Check if the resulting value corresponds to one of the keys
     brlo poll_kb_key_1
-    cpi r20, 61
+    cpi r20, 96
     brlo poll_kb_key_2
-    cpi r20, 73
+    cpi r20, 154
     brlo poll_kb_key_3
-    cpi r20, 83
+    cpi r20, 222
     brlo poll_kb_key_4
 
-    rjmp poll_kb_key_none            ; No key is pressed 
-
-; Load key-id into r26 and return
-poll_kb_key_1:                       ; UP key
-    ldi r17, (DIR_UP + 1)
-    rjmp poll_kb_update_r26
-
-poll_kb_key_2:                       ; DOWN key
-    ldi r17, (DIR_DOWN + 1)
-    rjmp poll_kb_update_r26
-
-poll_kb_key_3:                       ; LEFT key
-    ldi r17, (DIR_LEFT + 1)               
-    rjmp poll_kb_update_r26
-
-poll_kb_key_4:                       ; RIGHT key
-    ldi r17, (DIR_RIGHT + 1)
-    rjmp poll_kb_update_r26
-
+; Load key-id into KB_REG and return
 poll_kb_key_none:
-    ldi r17, 0
+    ldi r17, 0                       ; No key is pressed 
+    rjmp poll_kb_update_r26
+
+poll_kb_key_1:
+    ldi r17, (KEY_LU + 1)
+    rjmp poll_kb_update_r26
+
+poll_kb_key_2:
+    ldi r17, (KEY_RU + 1)
+    rjmp poll_kb_update_r26
+
+poll_kb_key_3:
+    ldi r17, (KEY_RB + 1)               
+    rjmp poll_kb_update_r26
+
+poll_kb_key_4:
+    ldi r17, (KEY_LB + 1)
+    rjmp poll_kb_update_r26
 
 poll_kb_update_r26:
-    mov r20, r26
+    mov r20, KB_REG
     andi r20, 0x7f
     cp r17, r20              ; Check if the currently pressed key is different from the previously pressed one
     brne poll_kb_key_change
-    mov r26, r17
+    mov KB_REG, r17
     ret
 poll_kb_key_change:
-    mov r26, r17
-    ori r26, 0x80         ; Set MSB to indicate that it's a diffferent key now
+    mov KB_REG, r17
+    ori KB_REG, 0x80         ; Set MSB to indicate that it's a diffferent key now
     ret
 
 
@@ -370,14 +353,14 @@ new_game:
 new_game_player_select_loop:
     rcall looong_delay
     rcall poll_kb
-    sbrs r26, 7                                  ; Check if any key is pressed
+    sbrs KB_REG, 7                                  ; Check if any key is pressed
     rjmp new_game_player_select_loop_cont
-    andi r26, 0b10
+    andi KB_REG, 0b10
     breq new_game_cpu_vs_human
-    ldi r16, 0b01
+    ldi r16, 0b10
     rjmp new_game_ret
 new_game_cpu_vs_human:
-    ldi r16, 0b10
+    ldi r16, 0b01
     rjmp new_game_ret
 
 new_game_player_select_loop_cont:
@@ -415,9 +398,6 @@ new_point_player2_side:
 new_point_cont:
     ldi r16, 4
     sts ball_y, r16
-    ldi r16, 0
-    sts ball_mov_x, r16
-    sts ball_mov_y, r16
     ldi r16, 23
     sts ball_vel_y, r16
 
@@ -606,9 +586,9 @@ move_paddles_start:
     rjmp move_paddles_draw_left
 
 move_paddles_check_left_controls:
-    cpi r26, 0b10000010
+    cpi KB_REG, (0x80 | (KEY_LU + 1))
     breq move_paddles_move_left_up
-    cpi r26, 0b10000011
+    cpi KB_REG, (0x80 | (KEY_LB + 1))
     breq move_paddles_move_left_down
     rjmp move_paddles_draw_left
 
@@ -655,9 +635,9 @@ move_paddles_draw_left:
     rjmp move_paddles_draw_right
 
 move_paddles_check_right_controls:
-    cpi r26, 0b10000100
+    cpi KB_REG, (0x80 | (KEY_RU + 1))
     breq move_paddles_move_right_up
-    cpi r26, 0b10000001
+    cpi KB_REG, (0x80 | (KEY_RB + 1))
     breq move_paddles_move_right_down
     rjmp move_paddles_draw_right
 
