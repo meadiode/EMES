@@ -1,4 +1,9 @@
+
+import os
+from typing_extensions import Literal
+from math import sin, cos, pi
 import cadquery as cq
+
 try:
     from xvis import show, style
 except ImportError:
@@ -49,7 +54,7 @@ class Housing:
     DISP_FILTER_H_OFFSET = 1.0
 
     BUTTON_D = 5.0
-    BUTTONS_OFFSET = 0.2
+    BUTTONS_Z_OFFSET = 0.4
 
     SCREW_SPACE = 4.0
     FCUT_DEPTH = SCREW_SPACE + 0.5
@@ -74,9 +79,10 @@ class Housing:
     DISP_CENTER_XY = (0.2, -4.8)
 
 
-    def __init__(self, blind_top, heatserts):
+    def __init__(self, blind_top, heatserts, speaker_grill_style):
         self.blind_top = blind_top
         self.heatserts = heatserts
+        self.speaker_grill_style = speaker_grill_style
 
         edges = []
         board = Board.from_file('./kicad/power_supply/power_supply.kicad_pcb')
@@ -235,7 +241,7 @@ class Housing:
         return self.housing_bottom
 
 
-    def build_middle(self):
+    def build_middle(self, speaker_grill_style: Literal['slits', 'holes']):
         usb_port_cutout = (
             cq.Workplane('XZ')
                 .moveTo(6.7, 0.0)
@@ -252,40 +258,59 @@ class Housing:
                 .translate((0.0, 0.0, self.BOTTOM_H))
             )
 
-        speaker_grill_cutout = (
-            cq.Workplane('YZ')
-                .pushPoints(((0, 0), (0, -1.5), (0, -3), (0, 1.5), (0, 3)))
-                .slot2D(7.0, 0.8)
-                .extrude(10.0, both=True)
-                .rotate((0, 0, 0), (1, 0, 0), 45.0)
-                .intersect((cq.Workplane('YZ')
-                            # .circle(5.0 / 2)
-                            .rect(5.0, 4.0)
-                            .extrude(10.0, both=True)
-                            .edges('|X')
-                            .fillet(0.5)))
-                .translate((-20.0, -1.5, 7.0))
-            )
+        if speaker_grill_style == 'slits':
+            speaker_grill_cutout = (
+                cq.Workplane('YZ')
+                    .pushPoints(((0, 0), (0, -1.5), (0, -3), (0, 1.5), (0, 3)))
+                    .slot2D(7.0, 0.8)
+                    .extrude(10.0, both=True)
+                    .rotate((0, 0, 0), (1, 0, 0), 45.0)
+                    .intersect((cq.Workplane('YZ')
+                                # .circle(5.0 / 2)
+                                .rect(5.0, 4.0)
+                                .extrude(10.0, both=True)
+                                .edges('|X')
+                                .fillet(0.5)
+                                ))
+                    .translate((-20.0, -1.5, 7.0))
+                )
 
-        strap_cutout = \
-            (cq.Workplane('XY')
-                .vLine(10.0)
-                .hLine(-self.STRAP_TH)
-                .vLine(-10.0 - self.STRAP_TH)
-                .hLine(15.0)
-                .vLine(self.STRAP_TH)
-                .close()
-                .extrude(10.0)
-                .edges('|Z and <X and <Y')
-                .fillet(5.0)
-                .edges('|Z')
-                .edges('>>Y[1]')
-                .edges('<X')
-                .fillet(2.5)
-                .edges('<Z')
-                .fillet(self.STRAP_TH / 2 - 0.01)
-                .translate((14.3, 6.8, self.BOTTOM_H + 1.0))
-            )
+        else:
+            holes = [(0, 0),]
+            n = 6
+            an = pi * 2 / n
+            r = 1.8
+            holes = holes + [(cos(an * i) * r,
+                              sin(an * i) * r) for i in range(n)]
+
+            speaker_grill_cutout = (
+                cq.Workplane('YZ')
+                    .pushPoints(holes)
+                    .circle(0.6)
+                    .extrude(10.0, both=True)
+                    .translate((-20.0, -1.5, 7.0))
+                )
+
+        strap_cutout_path = (
+            cq.Workplane('XY')
+            .moveTo(0, 10)
+            .vLineTo(5)
+            .radiusArc((5, 0), -5.0)
+            .hLineTo(10)
+            .wire()
+            .translate((0, -10, 0))
+        )
+
+        strap_cutout = (
+            cq.Workplane('XZ')
+            .moveTo(-self.STRAP_TH / 2, 0)
+            .radiusArc((self.STRAP_TH / 2, 0), -self.STRAP_TH / 2)
+            .vLineTo(10)
+            .hLine(-self.STRAP_TH)
+            .close()
+            .sweep(strap_cutout_path)
+            .translate((12.8, 15.0, self.BOTTOM_H + self.STRAP_TH / 2 + 1.0))
+        )
 
         if not hasattr(self, 'housing_whole'):
             self.build_whole_solid()
@@ -323,6 +348,15 @@ class Housing:
         if not hasattr(self, 'housing_whole'):
             self.build_whole_solid()
 
+        button_cutout = self.build_button(cutter=True)
+
+        buttons_cutout = (
+            cq.Workplane('XY')
+            .pushPoints(self.BUTTONS_XY)
+            .eachpoint(button_cutout)
+            .translate((0, 0, self.MIDDLE_OFFSET + self.PCB_TH + self.BUTTONS_Z_OFFSET))
+        )
+
         self.housing_top = (
             self.housing_whole
                 .split(cq.Face.makePlane(basePnt=(0, 0, self.MIDDLE_OFFSET)))
@@ -343,26 +377,25 @@ class Housing:
                 .cutBlind(self.PCB_TH)
 
                 # Button holes
-                .pushPoints(self.BUTTONS_XY)
-                .circle(self.BUTTON_D / 2 + self.TOL * 2)
-                .cutThruAll()
-                .workplaneFromTagged('z_top')
-                .workplane(offset=self.PCB_TH).tag('z_btn')
-                .pushPoints(self.BUTTONS_XY)
-                .circle(self.BUTTON_D / 2 + 0.7)
-                .cutBlind(self.BUTTONS_OFFSET)
-                # Button holes inner chamfers 
-                .edges(RadiusSelector(self.BUTTON_D / 2 + self.TOL,
-                                      self.BUTTON_D / 2 + self.TOL * 3))
-                .edges('<Z')
-                .chamfer(0.49)
+                .cut(buttons_cutout)
 
                 # Display filter recess
-                .workplaneFromTagged('z_btn')
+                .faces('>Z')
+                .workplane(offset=-0.4)
                 .moveTo(*self.DISP_CENTER_XY)
                 .rect(self.DISP_FILTER_SX + self.TOL, self.DISP_FILTER_SY + self.TOL, centered=True)
-                .cutBlind(self.DISP_FILTER_H_OFFSET)
+                .cutBlind(-10.0)
             )
+
+
+        # self.housing_top = (
+        #     self.housing_top
+        #     .faces('>Z')
+        #     .workplane(offset=-2.1)
+        #     .pushPoints(self.SCREWS_XY)
+        #     .circle(2.5 / 2)
+        #     .extrude(0.1)
+        # )
 
         if not self.blind_top:
             self.housing_top = (
@@ -378,24 +411,48 @@ class Housing:
         return self.housing_top
 
 
-    def build_button(self):
-        self.button = (
-            cq.Workplane('XZ')
-                .hLine(self.BUTTON_D / 2 + 0.6)
-                .lineTo(self.BUTTON_D / 2, 0.6)
-                .vLineTo(2.5)
-                .radiusArc((0.0, 3.0), -4.0)
-                .close()
-                .revolve()
-                .edges('>>Z[4]')
-                .fillet(1.0)
-                # .faces('<Z')
-                # .workplane()
-                # .circle(2.5 / 2)
-                # .cutBlind(-0.3)
-                )
+    def build_button(self, cutter=False):
+        
+        extra = 0.0
+        if cutter:
+            extra = 0.1
 
-        return self.button
+        FLANGE_W = 0.6
+        FLANGE_H = 0.5
+
+        button = (
+            cq.Workplane('XZ')
+            .hLine(self.BUTTON_D / 2 + FLANGE_W + extra)
+            .vLine(FLANGE_H)
+            .hLineTo(self.BUTTON_D / 2 + extra)
+            .vLineTo(2.5)
+            .radiusArc((0.0, 3.0), -4.0)
+            .close()
+            .revolve()
+            .edges('>>Z[4]')
+            .fillet(1.0)
+        )
+
+        if not cutter:
+            button = (
+                button
+                .faces('<Z')
+                .workplane()
+                .circle(self.BUTTON_D / 2 - 1.0)
+                .cutBlind(-0.8)
+            )
+
+            self.button = button
+        else:
+            button = (
+                button
+                .faces('<Z')
+                .workplane()
+                .circle(self.BUTTON_D / 2 + FLANGE_W + extra)
+                .extrude(10.0)
+            )
+
+        return button
 
 
     def build_buttons(self):
@@ -406,7 +463,7 @@ class Housing:
             cq.Workplane('XY')
                 .pushPoints(self.BUTTONS_XY)
                 .eachpoint(self.button)
-                .translate((0, 0, self.MIDDLE_OFFSET + 1.8)))
+                .translate((0, 0, self.MIDDLE_OFFSET + self.PCB_TH + self.BUTTONS_Z_OFFSET - 0.001)))
 
         return self.buttons
 
@@ -424,31 +481,55 @@ class Housing:
 
     def build_all(self):
         self.build_top()
-        self.build_middle()
+        self.build_middle(self.speaker_grill_style)
         self.build_bottom()
         self.build_buttons()
         if not self.blind_top:
             self.build_display_filter()
 
 
+    def export(self, output_dir, prefix, top=True,
+               middle=True, bottom=True, button=True):
+        try:
+            os.mkdir(output_dir)
+        except FileExistsError:
+            pass
+
+        if top:
+            self.housing_top.val().exportStep(
+                os.path.join(output_dir, f'{prefix}_housing_top.stp'))
+
+        if middle:
+            self.housing_middle.val().exportStep(
+                os.path.join(output_dir, f'{prefix}_housing_middle.stp'))
+
+        if bottom:
+            self.housing_bottom.val().exportStep(
+                os.path.join(output_dir, f'{prefix}_housing_bottom.stp'))
+
+        if button:
+            self.button.val().exportStep(
+                os.path.join(output_dir, f'{prefix}_button.stp'))
+
+
+
+
 if __name__ == '__main__':
-    hs_fdm = Housing(blind_top=True, heatserts=True)
+    hs_fdm = Housing(blind_top=True, heatserts=True, speaker_grill_style='holes')
     hs_fdm.build_all()
+
+    hs_sla = Housing(blind_top=True, heatserts=False, speaker_grill_style='slits')
+    hs_sla.build_all()
 
     show(
          # style(hs_fdm.build_whole_solid(), color='cyan', alpha=0.3, markersize=1),
-         # style(hs_fdm.build_bottom(), color='cyan', alpha=0.3, markersize=1),
          style(hs_fdm.housing_top, color='cyan', alpha=0.3, markersize=1),
          style(hs_fdm.buttons, color='red', alpha=0.1, markersize=1),
          style(hs_fdm.housing_middle, color='steelblue', alpha=0.3, markersize=1),
          style(hs_fdm.housing_bottom, color='cyan', alpha=0.3, markersize=1),
-         # # style(display_filter, color='gray', alpha=0.3, markersize=1),
-         # style(load_power_supply_pcb(), color='green', alpha=1.0, markersize=1),
-         style(hs_fdm.load_base_board_pcb(), color='green', alpha=1.0, markersize=1),
+         # style(hs_fdm.load_base_board_pcb(), color='green', alpha=1.0, markersize=1),
+         # style(hs_fdm.load_power_supply_pcb(), color='green', alpha=1.0, markersize=1),
          )
-
-    # housing_bottom.val().exportStep(OUTPUT_DIR + '/housing_bottom.stp')
-    # housing_middle.val().exportStep(OUTPUT_DIR + '/housing_middle.stp')
-    # housing_top.val().exportStep(OUTPUT_DIR + '/housing_top.stp')
-    # housing_top_blind.val().exportStep(OUTPUT_DIR + '/housing_top_blind.stp')
-    # button.val().exportStep(OUTPUT_DIR + '/button.stp')
+    
+    hs_fdm.export(f'{OUTPUT_DIR}/fdm', 'fdm')
+    hs_sla.export(f'{OUTPUT_DIR}/sla', 'sla')

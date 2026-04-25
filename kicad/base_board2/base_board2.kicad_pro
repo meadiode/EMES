@@ -508,7 +508,7 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "../../../../../projects/emes/kicad/base_board2/base_board2_gerbers",
+      "plot": "base_board2_gerbers/",
       "pos_files": "",
       "specctra_dsn": "",
       "step": "../../3dcad/housing/base_board2.step",

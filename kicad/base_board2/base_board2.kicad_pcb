@@ -137,7 +137,7 @@
 			(mirror no)
 			(drillshape 0)
 			(scaleselection 1)
-			(outputdirectory "../../../../../projects/emes/kicad/base_board2/base_board2_gerbers")
+			(outputdirectory "base_board2_gerbers/")
 		)
 	)
 	(net 0 "")
@@ -20670,6 +20670,19 @@
 				(thickness 0.15)
 			)
 			(justify left bottom)
+		)
+	)
+	(gr_text "V1.2"
+		(at 139.38 65.56 0)
+		(layer "B.SilkS")
+		(uuid "cbf708f5-29b1-44d2-8360-1dc65589344a")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.2)
+				(bold yes)
+			)
+			(justify left bottom mirror)
 		)
 	)
 	(segment
