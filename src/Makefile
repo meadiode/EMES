@@ -90,6 +90,18 @@ egg_upload: egg
 	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/egg.hex:i
 .PHONY: egg_upload
 
+simon: $(BUILD_DIR)
+	$(COMPILE) -c simon.S -o $(BUILD_DIR)/simon.o
+	$(COMPILE) -nostdlib -o $(BUILD_DIR)/simon.elf $(BUILD_DIR)/simon.o
+	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/simon.elf $(BUILD_DIR)/simon.hex
+	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/simon.elf
+
+simon_upload: simon
+	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/simon.hex:i
+.PHONY: simon_upload
+
+
+
 
 clean:
 	$(RM) -rf $(BUILD_DIR)

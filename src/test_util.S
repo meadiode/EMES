@@ -4,10 +4,10 @@
 #define BEEP_REG          r25
 #define KB_REG            r26
 
-#define DIR_UP     0x00
-#define DIR_DOWN   0x03
-#define DIR_LEFT   0x01
-#define DIR_RIGHT  0x02
+#define KEY_LU     1
+#define KEY_LB     0
+#define KEY_RU     3
+#define KEY_RB     2
 
 #define SPEAKER_PWM_DUTY 500
 #define SPEAKER_PWM(Hz)  (8000000 / (Hz))  ; Min Hz value: 122
@@ -418,20 +418,20 @@ poll_kb_key_none:
     ldi r17, 0                       ; No key is pressed 
     rjmp poll_kb_update_r26
 
-poll_kb_key_1:                       ; UP key
-    ldi r17, (DIR_UP + 1)
+poll_kb_key_1:
+    ldi r17, (KEY_LU + 1)
     rjmp poll_kb_update_r26
 
-poll_kb_key_2:                       ; DOWN key
-    ldi r17, (DIR_DOWN + 1)
+poll_kb_key_2:
+    ldi r17, (KEY_RU + 1)
     rjmp poll_kb_update_r26
 
-poll_kb_key_3:                       ; LEFT key
-    ldi r17, (DIR_LEFT + 1)               
+poll_kb_key_3:
+    ldi r17, (KEY_RB + 1)               
     rjmp poll_kb_update_r26
 
-poll_kb_key_4:                       ; RIGHT key
-    ldi r17, (DIR_RIGHT + 1)
+poll_kb_key_4:
+    ldi r17, (KEY_LB + 1)
     rjmp poll_kb_update_r26
 
 poll_kb_update_r26:
