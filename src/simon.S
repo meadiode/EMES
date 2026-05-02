@@ -620,29 +620,6 @@ play_tune_loop:
     ret
 
 
-.global beep
-beep:
-    ldi r17, ((1 << COM0B1) | (1 << WGM01))
-    out TCCR0A, r17
-    
-    out ICR0H, r19
-    out ICR0L, r18
-
-    ldi r18, hi8(500)
-    ldi r17, lo8(500)
-    out OCR0BH, r18
-    out OCR0BL, r17
-
-    ret
-
-
-.global no_beep
-no_beep:
-    ldi r17, 1 << COM0B1
-    out TCCR0A, r17
-    ret
-
-
 .global rand
 ; Get a very pseudo random value
 ; Outputs: r17 - random value [0..255]

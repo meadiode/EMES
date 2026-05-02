@@ -100,7 +100,15 @@ simon_upload: simon
 	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/simon.hex:i
 .PHONY: simon_upload
 
+stak: $(BUILD_DIR)
+	$(COMPILE) -c stak.S -o $(BUILD_DIR)/stak.o
+	$(COMPILE) -nostdlib -o $(BUILD_DIR)/stak.elf $(BUILD_DIR)/stak.o
+	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/stak.elf $(BUILD_DIR)/stak.hex
+	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/stak.elf
 
+stak_upload: stak
+	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/stak.hex:i
+.PHONY: simon_upload
 
 
 clean:
