@@ -81,22 +81,24 @@ main_write_pwm_val:
     inc r21
     cpi r21, (198 + 1)
     brne main_write_pwm_val
-
+   
+    ldi r16, 0
+    sts kb_stat, r16
 
 main_start:
     ldi r16, 0
-    sts kb_stat, r16
-    ldi r16, 13
+    sts score, r16
+    ldi r16, 14
     sts layer_size, r16
-    ldi r16, 8
+    ldi r16, 9
     sts layer_y, r16
     ldi r16, 1
     sts layer_x, r16
     ldi r16, 1
     sts swing_dir, r16
-    ldi r16, 1
+    ldi r16, 0
     sts prev_layer_x1, r16
-    ldi r16, 13
+    ldi r16, 14
     sts prev_layer_x2, r16
     ldi r16, 250
     sts speed, r16
@@ -106,12 +108,6 @@ main_start:
     ldi r23, 1
     ldi r24, 9
     ldi r22, 40
-
-main_draw_first_layer_loop:
-    rcall display_set_pixel
-    inc r23
-    cpi r23, 14
-    brne main_draw_first_layer_loop
 
 main_game_loop:
     lds r24, layer_y
@@ -215,6 +211,9 @@ main_update_x1:
 main_update_layer_size:
     tst r30
     breq main_game_over
+    lds r16, score
+    inc r16
+    sts score, r16
     sts layer_size, r30
     tst r24
     brmi main_new_round
@@ -230,31 +229,81 @@ main_game_over:
     ldi r30, lo8(tune_game_over + 0x4000)
     ldi r31, hi8(tune_game_over + 0x4000)
     rcall play_tune
-    rjmp main_idle
+    rcall show_score
+    rjmp main_game_over_idle
 
 main_new_round:
     ldi r30, lo8(tune_levelup + 0x4000)
     ldi r31, hi8(tune_levelup + 0x4000)
     rcall play_tune
 
-    ldi r16, 13
+    ldi r16, 14
     sts layer_size, r16
-    ldi r16, 8
+    ldi r16, 9
     sts layer_y, r16
-    ldi r16, 1
+    ldi r16, 0
     sts prev_layer_x1, r16
-    ldi r16, 13
+    ldi r16, 14
     sts prev_layer_x2, r16
     lds r16, speed
     subi r16, 10      ; Increase speed
     sts speed, r16
     rcall display_clear
-    rjmp main_draw_first_layer_loop
+    rjmp main_game_loop
 
 
-main_idle:
-    rjmp main_idle
+main_game_over_idle:
+    rcall poll_kb
+    cpi r26, 0x81
+    brne main_game_over_idle_cont
+    rjmp main_start
+main_game_over_idle_cont:
+    rjmp main_game_over_idle
 
+
+.global show_score
+; Call depth: 5
+show_score:
+    rcall display_clear
+
+    lds r17, score
+    ldi r18, 0
+    ldi r19, 0
+
+show_score_calc_loop:
+    cpi r17, 10
+    brlo show_score_draw
+    subi r17, 10
+    inc r18
+    cpi r18, 10
+    brne show_score_calc_loop_cont
+    inc r19
+    ldi r18, 0
+show_score_calc_loop_cont:
+    rjmp show_score_calc_loop
+
+show_score_draw:
+    lsl r17
+    lsl r18
+    lsl r19
+    ldi r30, lo8(img_digit_thin_0 + 0x4000)
+    ldi r31, hi8(img_digit_thin_0 + 0x4000)
+    ldi r27, 2
+    ldi r28, 2
+    ldi r29, 0x20
+    add r30, r19
+    
+    rcall display_draw_img_3x5
+    ldi r30, lo8(img_digit_thin_0 + 0x4000)
+    ldi r27, 6
+    add r30, r18
+    rcall display_draw_img_3x5
+
+    ldi r30, lo8(img_digit_thin_0 + 0x4000)
+    ldi r27, 10
+    add r30, r17
+    rcall display_draw_img_3x5
+    ret
 
 
 .global long_delay
@@ -452,6 +501,44 @@ display_clear_row_loop:
     ret
 
 
+.global display_draw_img_3x5
+; Inputs: r27 - x offset; r28 - y offset; r29 - intensity; Z(r31, r30) - bitmap address
+; Used registers: r16, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31
+; Call depth: 4
+display_draw_img_3x5:
+    mov r24, r28 ; r24 - y
+    ldi r25, 8 ; r25 - bit counter
+
+display_draw_img_3x5_y_loop:
+    mov r23, r27 ; r23 - x
+display_draw_img_3x5_x_loop:
+    cpi r25, 8  ; Check if all bits in the current byte are read
+    brne display_draw_img_3x5_put_pixel
+    ldi r25, 0
+    ld r26, Z+  ; Fetch the next byte if the current one ended
+
+display_draw_img_3x5_put_pixel:
+    sbrs r26, 7
+    ldi r22, 0
+    sbrc r26, 7
+    mov r22, r29
+    inc r25
+    lsl r26
+    rcall display_set_pixel
+    inc r23
+    mov r16, r23
+    sub r16, r27
+    cpi r16, 3
+    brlo display_draw_img_3x5_x_loop
+
+    inc r24
+    mov r16, r24
+    sub r16, r28
+    cpi r16, 5
+    brlo display_draw_img_3x5_y_loop
+
+    ret
+
 
 .global poll_kb
 ; Read keyboard
@@ -538,6 +625,66 @@ play_tune_loop:
 
 .section .text
 
+; 3x5
+img_digit_thin_0:
+    .byte 0b11010110
+    .byte 0b11010110
+
+
+; 3x5
+img_digit_thin_1:
+    .byte 0b01011001
+    .byte 0b00101110
+
+
+; 3x5
+img_digit_thin_2:
+    .byte 0b11100111
+    .byte 0b11001110
+
+
+; 3x5
+img_digit_thin_3:
+    .byte 0b11100111
+    .byte 0b10011110
+
+
+; 3x5
+img_digit_thin_4:
+    .byte 0b10110111
+    .byte 0b10010010
+
+
+; 3x5
+img_digit_thin_5:
+    .byte 0b11110011
+    .byte 0b10011110
+
+
+; 3x5
+img_digit_thin_6:
+    .byte 0b11110011
+    .byte 0b11011110
+
+
+; 3x5
+img_digit_thin_7:
+    .byte 0b11100101
+    .byte 0b00100100
+
+
+; 3x5
+img_digit_thin_8:
+    .byte 0b11110111
+    .byte 0b11011110
+
+
+; 3x5
+img_digit_thin_9:
+    .byte 0b11110111
+    .byte 0b10011110
+
+
 tune_beep:
     .byte 1
     .byte 6
@@ -587,6 +734,9 @@ prev_layer_x2:
     .byte 0x00
 
 speed:
+    .byte 0x00
+
+score:
     .byte 0x00
 
 
