@@ -108,7 +108,17 @@ stak: $(BUILD_DIR)
 
 stak_upload: stak
 	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/stak.hex:i
-.PHONY: simon_upload
+.PHONY: stak_upload
+
+birb: $(BUILD_DIR)
+	$(COMPILE) -c birb.S -o $(BUILD_DIR)/birb.o
+	$(COMPILE) -nostdlib -o $(BUILD_DIR)/birb.elf $(BUILD_DIR)/birb.o
+	$(OBJCOPY) -j .text -j .data -O ihex $(BUILD_DIR)/birb.elf $(BUILD_DIR)/birb.hex
+	$(SIZE) --format=avr --mcu=$(DEVICE) $(BUILD_DIR)/birb.elf
+
+birb_upload: birb
+	$(DRIVER) -v -p $(DEVICE) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/birb.hex:i
+.PHONY: birb_upload
 
 
 clean:
